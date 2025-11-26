@@ -1,8 +1,11 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useCTA } from '../../../hooks/useCTA';
+import { useSettings } from '../../../context/SettingsContext';
 
 const TrainModule = () => {
     const { arrivals, loading, error, lastUpdated, refresh, stationName, isPaused, togglePause } = useCTA();
+    const { currentTheme } = useSettings();
+    const theme = currentTheme.colors;
 
     // Local state to manage the list with exit animations
     const [displayedArrivals, setDisplayedArrivals] = useState([]);
@@ -101,15 +104,15 @@ const TrainModule = () => {
 
     if (loading && arrivals.length === 0) {
         return (
-            <div className="h-full w-full flex items-center justify-center bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-6 animate-pulse">
-                <div className="text-blue-400 font-medium">Loading Train Data...</div>
+            <div className={`h-full w-full flex items-center justify-center ${theme.moduleBg} rounded-3xl ${theme.border} border p-6 animate-pulse`}>
+                <div className={`${theme.textAccent} font-medium`}>Loading Train Data...</div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl border border-red-500/20 p-6">
+            <div className={`h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl border border-red-500/20 p-6`}>
                 <div className="text-red-400 font-bold mb-2">Connection Error</div>
                 <div className="text-sm text-red-300 text-center mb-4">{error}</div>
                 <button
@@ -123,16 +126,16 @@ const TrainModule = () => {
     }
 
     return (
-        <div className="h-full w-full bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-4 flex flex-col shadow-xl relative overflow-hidden">
+        <div className={`h-full w-full ${theme.moduleBg} rounded-3xl ${theme.border} border p-4 flex flex-col shadow-xl relative overflow-hidden`}>
 
             <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
+                <h2 className={`text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
+                    <span className={`w-1.5 h-6 ${theme.accentColor} rounded-full`}></span>
                     {stationName ? `${stationName} Arrivals` : 'Train Arrivals'}
                 </h2>
                 <div className="flex items-center -space-x-1">
                     {lastUpdated && (
-                        <span className="text-[10px] text-gray-400 hidden sm:block mr-1">
+                        <span className={`text-[10px] ${theme.textSecondary} hidden sm:block mr-1`}>
                             Updated: {lastUpdated.toLocaleTimeString()}
                         </span>
                     )}
@@ -140,7 +143,7 @@ const TrainModule = () => {
                     {/* Pause/Play Button */}
                     <button
                         onClick={togglePause}
-                        className={`p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${isPaused ? 'text-yellow-400' : 'text-gray-300 hover:text-blue-400'}`}
+                        className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${isPaused ? 'text-yellow-400' : `${theme.textSecondary} ${theme.textAccent}`}`}
                         title={isPaused ? "Resume Updates" : "Pause Updates"}
                         aria-label={isPaused ? "Resume Updates" : "Pause Updates"}
                     >
@@ -158,11 +161,11 @@ const TrainModule = () => {
                     <button
                         onClick={refresh}
                         disabled={loading || isPaused}
-                        className={`p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : 'hover:text-blue-400'}`}
+                        className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : `hover:${theme.textAccent}`}`}
                         title="Refresh Data"
                         aria-label="Refresh Train Data"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${theme.textSecondary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </button>
@@ -171,11 +174,11 @@ const TrainModule = () => {
 
             <div className="flex-grow overflow-y-auto space-y-4 pr-1 custom-scrollbar touch-pan-y">
                 {Object.keys(groupedArrivals).length === 0 ? (
-                    <div className="text-center text-gray-500 mt-10">No trains scheduled</div>
+                    <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (
                     Object.entries(groupedArrivals).map(([direction, trains]) => (
                         <div key={direction}>
-                            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 border-b border-white/5 pb-1">
+                            <h3 className={`text-xs font-medium ${theme.textSecondary} uppercase tracking-wider mb-2 border-b ${theme.border} pb-1`}>
                                 {direction}
                             </h3>
                             <div className="space-y-2 relative">
@@ -187,22 +190,22 @@ const TrainModule = () => {
                                     return (
                                         <div
                                             key={train.rn}
-                                            className={`flex items-center justify-between bg-white/5 p-2 rounded-lg hover:bg-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
+                                            className={`flex items-center justify-between ${theme.bgSecondary} p-2 rounded-lg ${theme.moduleHover} transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 {/* Line Color Badge (No Text) */}
                                                 <div className={`w-2 h-6 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
 
                                                 <div>
-                                                    <div className="font-bold text-white text-base leading-tight">{train.destNm}</div>
-                                                    <div className="text-[10px] text-gray-500">Run #{train.rn}</div>
+                                                    <div className={`font-bold ${theme.textPrimary} text-base leading-tight`}>{train.destNm}</div>
+                                                    <div className={`text-[10px] ${theme.textSecondary}`}>Run #{train.rn}</div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className={`text-xl font-bold ${isDue ? 'text-yellow-400 animate-pulse' : 'text-white'}`}>
+                                                <div className={`text-xl font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
                                                     {isDue ? 'Due' : mins}
                                                 </div>
-                                                <div className="text-[10px] text-gray-400">
+                                                <div className={`text-[10px] ${theme.textSecondary}`}>
                                                     {!isDue && <span className="mr-1 opacity-70">est</span>}
                                                     {formatTime(train.arrT)}
                                                 </div>

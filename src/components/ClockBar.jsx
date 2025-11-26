@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useSettings } from '../context/SettingsContext';
 
 const ClockBar = ({ onSettingsClick }) => {
     const [time, setTime] = useState(new Date());
+    const { currentTheme } = useSettings();
+    const theme = currentTheme.colors;
 
     useEffect(() => {
         const timer = setInterval(() => setTime(new Date()), 1000);
@@ -17,18 +20,18 @@ const ClockBar = ({ onSettingsClick }) => {
     };
 
     return (
-        <div className="w-full bg-white/5 backdrop-blur-md border-b border-white/10 p-6 flex justify-between items-center shadow-lg mb-3 rounded-xl">
+        <div className={`w-full ${theme.moduleBg} border-b ${theme.border} p-6 flex justify-between items-center shadow-lg mb-3 rounded-xl`}>
             <div className="flex items-center gap-3">
-                <div className="text-3xl font-bold text-white tracking-tight leading-none">
+                <div className={`text-3xl font-bold ${theme.textPrimary} tracking-tight leading-none`}>
                     {formatTime(time)}
                 </div>
-                <div className="text-sm text-blue-200 font-medium uppercase tracking-wider">
+                <div className={`text-sm ${theme.textAccent} font-medium uppercase tracking-wider`}>
                     {formatDate(time)}
                 </div>
             </div>
             <button
                 onClick={onSettingsClick}
-                className="p-3 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/20 transition-colors text-gray-400 hover:text-white active:text-white absolute right-4 touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center"
+                className={`p-3 rounded-full ${theme.buttonBg} ${theme.buttonHover} ${theme.buttonActive} transition-colors ${theme.textSecondary} hover:${theme.textPrimary} absolute right-4 touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center`}
                 aria-label="Open Settings"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

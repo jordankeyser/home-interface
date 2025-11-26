@@ -4,8 +4,9 @@ import { useSettings } from '../../../context/SettingsContext';
 
 const WeatherModule = () => {
     const { weather, locationName, loading, error, refresh } = useWeather();
-    const { settings } = useSettings();
+    const { settings, currentTheme } = useSettings();
     const isPiMode = settings.isPiMode;
+    const theme = currentTheme.colors;
 
     const getWeatherDescription = (code) => {
         const codes = {
@@ -133,8 +134,8 @@ const WeatherModule = () => {
 
     if (loading && !weather) {
         return (
-            <div className="h-full w-full flex items-center justify-center bg-white/5 backdrop-blur-md rounded-3xl border border-white/10 p-6 animate-pulse">
-                <div className="text-blue-400 font-medium">Loading Weather...</div>
+            <div className={`h-full w-full flex items-center justify-center ${theme.moduleBg} rounded-3xl ${theme.border} border p-6 animate-pulse`}>
+                <div className={`${theme.textAccent} font-medium`}>Loading Weather...</div>
             </div>
         );
     }
@@ -156,19 +157,19 @@ const WeatherModule = () => {
     const bgAnimation = renderBackground(current.weather_code);
 
     return (
-        <div className="h-full w-full bg-gradient-to-br from-gray-900 to-blue-900 rounded-3xl border border-white/10 flex flex-col shadow-2xl relative overflow-hidden">
+        <div className={`h-full w-full bg-gradient-to-br ${theme.bgPrimary} rounded-3xl ${theme.border} border flex flex-col shadow-2xl relative overflow-hidden`}>
             {bgAnimation}
 
             <div className={`flex-grow flex flex-col items-center z-10 relative ${isPiMode ? 'justify-start pt-6' : 'justify-center -mb-12'}`}>
                 <div className="text-center">
-                    <h2 className={`font-light text-white/80 mb-1 tracking-wide ${isPiMode ? 'text-lg' : 'text-xl'}`}>{locationName}</h2>
-                    <div className={`leading-none font-bold text-white tracking-tighter drop-shadow-2xl ${isPiMode ? 'text-9xl' : 'text-8xl'}`}>
+                    <h2 className={`font-light ${theme.textPrimary} opacity-80 mb-1 tracking-wide ${isPiMode ? 'text-lg' : 'text-xl'}`}>{locationName}</h2>
+                    <div className={`leading-none font-bold ${theme.textPrimary} tracking-tighter drop-shadow-2xl ${isPiMode ? 'text-9xl' : 'text-8xl'}`}>
                         {Math.round(current.temperature_2m)}°
                     </div>
-                    <div className={`text-blue-200 font-medium uppercase tracking-widest ${isPiMode ? 'text-lg mt-1' : 'text-xl mt-2'}`}>
+                    <div className={`${theme.textAccent} font-medium uppercase tracking-widest ${isPiMode ? 'text-lg mt-1' : 'text-xl mt-2'}`}>
                         {getWeatherDescription(current.weather_code)}
                     </div>
-                    <div className={`text-white/60 mt-1 ${isPiMode ? 'text-sm' : 'text-base'}`}>
+                    <div className={`${theme.textPrimary} opacity-60 mt-1 ${isPiMode ? 'text-sm' : 'text-base'}`}>
                         H: {Math.round(daily.temperature_2m_max[0])}°  L: {Math.round(daily.temperature_2m_min[0])}°
                     </div>
                 </div>
@@ -176,43 +177,43 @@ const WeatherModule = () => {
                 <button
                     onClick={refresh}
                     disabled={loading}
-                    className={`absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : 'hover:text-blue-400'}`}
+                    className={`absolute top-4 right-4 p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : `hover:${theme.textAccent}`}`}
                     title="Refresh Data"
                     aria-label="Refresh Weather Data"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${theme.textSecondary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
             </div>
 
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-transparent pt-16 pb-4 px-4 z-20">
+            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${theme.bgTertiary === 'bg-gray-100' ? 'from-gray-200 via-gray-100/90' : 'from-gray-950 via-gray-900/80'} to-transparent pt-16 pb-4 px-4 z-20`}>
                 <div className="flex space-x-6 overflow-x-auto pb-2 justify-center mask-image-linear-gradient scrollbar-hide touch-pan-x">
                     {hourlyForecast.map((hour, idx) => (
                         <div key={idx} className="flex flex-col items-center space-y-1 min-w-[3rem]">
-                            <span className="text-xs text-blue-200/80">{formatHour(hour.time)}</span>
+                            <span className={`text-xs ${theme.textAccent} opacity-80`}>{formatHour(hour.time)}</span>
                             <span className="text-xl drop-shadow-md transform hover:scale-110 transition-transform">
                                 {hour.code === 0 ? '☀️' : hour.code <= 3 ? '⛅' : hour.code <= 67 ? '🌧️' : '❄️'}
                             </span>
-                            <span className="text-base font-bold text-white">{Math.round(hour.temp)}°</span>
+                            <span className={`text-base font-bold ${theme.textPrimary}`}>{Math.round(hour.temp)}°</span>
                         </div>
                     ))}
                 </div>
 
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent my-2"></div>
+                <div className={`w-full h-px bg-gradient-to-r from-transparent via-${theme.textPrimary}/20 to-transparent my-2`}></div>
 
                 <div className="flex justify-around text-center px-2">
                     <div>
-                        <div className="text-[10px] text-blue-200/70 uppercase tracking-wider mb-0.5">Wind</div>
-                        <div className="text-white font-semibold text-lg">{Math.round(current.wind_speed_10m)} <span className="text-xs font-normal opacity-60">mph</span></div>
+                        <div className={`text-[10px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Wind</div>
+                        <div className={`${theme.textPrimary} font-semibold text-lg`}>{Math.round(current.wind_speed_10m)} <span className="text-xs font-normal opacity-60">mph</span></div>
                     </div>
                     <div>
-                        <div className="text-[10px] text-blue-200/70 uppercase tracking-wider mb-0.5">Humidity</div>
-                        <div className="text-white font-semibold text-lg">{current.relative_humidity_2m}<span className="text-xs font-normal opacity-60">%</span></div>
+                        <div className={`text-[10px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Humidity</div>
+                        <div className={`${theme.textPrimary} font-semibold text-lg`}>{current.relative_humidity_2m}<span className="text-xs font-normal opacity-60">%</span></div>
                     </div>
                     <div>
-                        <div className="text-[10px] text-blue-200/70 uppercase tracking-wider mb-0.5">Precip</div>
-                        <div className="text-white font-semibold text-lg">{current.precipitation}<span className="text-xs font-normal opacity-60">"</span></div>
+                        <div className={`text-[10px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Precip</div>
+                        <div className={`${theme.textPrimary} font-semibold text-lg`}>{current.precipitation}<span className="text-xs font-normal opacity-60">"</span></div>
                     </div>
                 </div>
             </div>

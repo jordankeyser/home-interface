@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
+import { getTheme } from '../config/themes';
 
 const SettingsContext = createContext();
 
@@ -13,6 +14,7 @@ export const SettingsProvider = ({ children }) => {
             ctaStationId: '40380', // Default to a station (e.g., Clark/Lake or similar)
             zipCode: '60601', // Default to Chicago Loop
             isPiMode: false,
+            theme: 'dark', // Default theme
         };
     });
 
@@ -24,7 +26,13 @@ export const SettingsProvider = ({ children }) => {
         setSettings((prev) => ({ ...prev, ...newSettings }));
     };
 
-    const value = useMemo(() => ({ settings, updateSettings }), [settings]);
+    const currentTheme = useMemo(() => getTheme(settings.theme), [settings.theme]);
+
+    const value = useMemo(() => ({
+        settings,
+        updateSettings,
+        currentTheme
+    }), [settings, currentTheme]);
 
     return (
         <SettingsContext.Provider value={value}>

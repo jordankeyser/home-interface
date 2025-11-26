@@ -4,16 +4,17 @@ import { useSettings } from '../context/SettingsContext';
 
 const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
     const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
-    const { settings } = useSettings();
+    const { settings, currentTheme } = useSettings();
 
     const isPiMode = settings.isPiMode;
+    const theme = currentTheme.colors;
 
     // Use passed props if available, otherwise use local state
     const settingsOpen = isSettingsOpen !== undefined ? isSettingsOpen : localSettingsOpen;
     const setSettingsOpen = setIsSettingsOpen || setLocalSettingsOpen;
 
     return (
-        <div className={`min-h-screen w-full bg-black text-white relative overflow-hidden flex items-center justify-center ${!isPiMode ? 'bg-gradient-to-br from-gray-900 via-slate-800 to-black' : ''}`}>
+        <div className={`min-h-screen w-full ${theme.textPrimary} relative overflow-hidden flex items-center justify-center ${!isPiMode ? `bg-gradient-to-br ${theme.bgPrimary}` : 'bg-black'}`}>
 
             {/* Emulator Container */}
             <div
@@ -23,7 +24,7 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
                     }`}
             >
                 {/* Background Elements (Inside Container) */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br from-gray-900 via-slate-800 to-black">
+                <div className={`absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br ${theme.bgPrimary}`}>
                     <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
                     <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
                     <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>

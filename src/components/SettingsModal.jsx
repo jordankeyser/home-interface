@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
+import { themes } from '../config/themes';
 
 const SettingsModal = ({ isOpen, onClose }) => {
     const { settings, updateSettings } = useSettings();
@@ -191,8 +192,26 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                 </svg>
                             </button>
                             {openSections.theme && (
-                                <div className="p-4 space-y-4 bg-gray-900/30">
-                                    <p className="text-sm text-gray-500 italic">Coming soon...</p>
+                                <div className="p-4 space-y-3 bg-gray-900/30">
+                                    {Object.values(themes).map((theme) => (
+                                        <button
+                                            key={theme.id}
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, theme: theme.id }))}
+                                            className={`w-full px-4 py-3 rounded-lg transition-all font-medium touch-manipulation flex items-center justify-between ${
+                                                formData.theme === theme.id
+                                                    ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                                                    : 'bg-gray-800/50 text-gray-300 hover:bg-gray-800'
+                                            }`}
+                                        >
+                                            <span>{theme.name}</span>
+                                            {formData.theme === theme.id && (
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                            )}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
                         </div>
