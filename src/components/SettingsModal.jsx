@@ -82,13 +82,13 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-700 transition-colors"
+                                className="px-6 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 transition-colors touch-manipulation min-h-[48px]"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
-                                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors font-medium"
+                                className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-700 transition-colors font-medium touch-manipulation min-h-[48px]"
                             >
                                 Save Changes
                             </button>

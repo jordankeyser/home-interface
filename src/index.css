@@ -162,3 +162,41 @@ body {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
+
+/* Touch-friendly styles for Raspberry Pi Kiosk */
+* {
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+  -webkit-touch-callout: none;
+}
+
+/* Smooth scrolling with momentum on touch devices */
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent text selection on UI elements */
+button, .touch-manipulation {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Improve touch scrolling performance */
+.overflow-y-auto, .overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Disable cursor for true kiosk mode */
+body.kiosk-mode {
+  cursor: none;
+}
+
+/* Optional: Hide cursor after inactivity */
+@media (pointer: coarse) {
+  /* Touch device specific styles */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
