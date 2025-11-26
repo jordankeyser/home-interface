@@ -23,10 +23,14 @@ sudo apt upgrade -y
 # Install required packages
 echo "Step 2: Installing required packages..."
 
-# Try chromium-browser first, fall back to chromium
-if apt-cache show chromium-browser &> /dev/null; then
+# Determine which Chromium package is available
+if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate:.*[0-9]"; then
     CHROMIUM_PKG="chromium-browser"
+elif apt-cache policy chromium 2>/dev/null | grep -q "Candidate:.*[0-9]"; then
+    CHROMIUM_PKG="chromium"
 else
+    echo "ERROR: Neither chromium-browser nor chromium package found"
+    echo "Trying to install chromium anyway..."
     CHROMIUM_PKG="chromium"
 fi
 
