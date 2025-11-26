@@ -109,15 +109,19 @@ const WeatherModule = () => {
         const hours = [];
         const now = new Date();
 
+        // Find the current hour or the most recent hour
         let startIndex = -1;
         for (let i = 0; i < weather.hourly.time.length; i++) {
             const hourTime = new Date(weather.hourly.time[i]);
-            if (hourTime > now) {
+            // Check if this hour is the current hour or the closest one before now
+            if (hourTime.getTime() <= now.getTime()) {
                 startIndex = i;
+            } else {
                 break;
             }
         }
 
+        // If we found a valid starting point, get the next 12 hours from there
         if (startIndex !== -1) {
             for (let i = 0; i < 12 && (startIndex + i) < weather.hourly.time.length; i++) {
                 const idx = startIndex + i;
@@ -160,16 +164,16 @@ const WeatherModule = () => {
         <div className={`h-full w-full bg-gradient-to-br ${theme.bgPrimary} rounded-3xl ${theme.border} border flex flex-col shadow-2xl relative overflow-hidden`}>
             {bgAnimation}
 
-            <div className={`flex-grow flex flex-col items-center z-10 relative ${isPiMode ? 'justify-start pt-6' : 'justify-center -mb-12'}`}>
+            <div className={`flex-grow flex flex-col items-center z-10 relative ${isPiMode ? 'justify-start pt-2' : 'justify-start pt-8'}`}>
                 <div className="text-center">
-                    <h2 className={`font-light ${theme.textPrimary} opacity-80 mb-1 tracking-wide ${isPiMode ? 'text-lg' : 'text-xl'}`}>{locationName}</h2>
-                    <div className={`leading-none font-bold ${theme.textPrimary} tracking-tighter drop-shadow-2xl ${isPiMode ? 'text-9xl' : 'text-8xl'}`}>
+                    <h2 className={`font-light ${theme.textPrimary} opacity-80 mb-1 tracking-wide ${isPiMode ? 'text-base' : 'text-lg'}`}>{locationName}</h2>
+                    <div className={`leading-none font-bold ${theme.textPrimary} tracking-tighter drop-shadow-2xl ${isPiMode ? 'text-6xl' : 'text-7xl'}`}>
                         {Math.round(current.temperature_2m)}°
                     </div>
-                    <div className={`${theme.textAccent} font-medium uppercase tracking-widest ${isPiMode ? 'text-lg mt-1' : 'text-xl mt-2'}`}>
+                    <div className={`${theme.textAccent} font-medium uppercase tracking-widest ${isPiMode ? 'text-sm mt-1' : 'text-base mt-1'}`}>
                         {getWeatherDescription(current.weather_code)}
                     </div>
-                    <div className={`${theme.textPrimary} opacity-60 mt-1 ${isPiMode ? 'text-sm' : 'text-base'}`}>
+                    <div className={`${theme.textPrimary} opacity-60 mt-1 ${isPiMode ? 'text-xs' : 'text-sm'}`}>
                         H: {Math.round(daily.temperature_2m_max[0])}°  L: {Math.round(daily.temperature_2m_min[0])}°
                     </div>
                 </div>
@@ -187,33 +191,33 @@ const WeatherModule = () => {
                 </button>
             </div>
 
-            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${theme.bgTertiary === 'bg-gray-100' ? 'from-gray-200 via-gray-100/90' : 'from-gray-950 via-gray-900/80'} to-transparent pt-16 pb-4 px-4 z-20`}>
-                <div className="flex space-x-6 overflow-x-auto pb-2 justify-center mask-image-linear-gradient scrollbar-hide touch-pan-x">
+            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${theme.bgTertiary === 'bg-gray-100' ? 'from-gray-200 via-gray-100/90' : 'from-gray-950 via-gray-900/80'} to-transparent pt-8 pb-2 px-2 z-20`}>
+                <div className="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide touch-pan-x" style={{ scrollSnapType: 'x mandatory' }}>
                     {hourlyForecast.map((hour, idx) => (
-                        <div key={idx} className="flex flex-col items-center space-y-1 min-w-[3rem]">
-                            <span className={`text-xs ${theme.textAccent} opacity-80`}>{formatHour(hour.time)}</span>
-                            <span className="text-xl drop-shadow-md transform hover:scale-110 transition-transform">
+                        <div key={idx} className="flex flex-col items-center space-y-0.5 min-w-[2rem] flex-shrink-0" style={{ scrollSnapAlign: 'start' }}>
+                            <span className={`text-[9px] ${theme.textAccent} opacity-80`}>{formatHour(hour.time)}</span>
+                            <span className="text-sm drop-shadow-md">
                                 {hour.code === 0 ? '☀️' : hour.code <= 3 ? '⛅' : hour.code <= 67 ? '🌧️' : '❄️'}
                             </span>
-                            <span className={`text-base font-bold ${theme.textPrimary}`}>{Math.round(hour.temp)}°</span>
+                            <span className={`text-xs font-bold ${theme.textPrimary}`}>{Math.round(hour.temp)}°</span>
                         </div>
                     ))}
                 </div>
 
-                <div className={`w-full h-px bg-gradient-to-r from-transparent via-${theme.textPrimary}/20 to-transparent my-2`}></div>
+                <div className={`w-full h-px bg-gradient-to-r from-transparent via-${theme.textPrimary}/20 to-transparent my-1`}></div>
 
-                <div className="flex justify-around text-center px-2">
+                <div className="flex justify-around text-center px-2 pb-1">
                     <div>
-                        <div className={`text-[10px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Wind</div>
-                        <div className={`${theme.textPrimary} font-semibold text-lg`}>{Math.round(current.wind_speed_10m)} <span className="text-xs font-normal opacity-60">mph</span></div>
+                        <div className={`text-[8px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Wind</div>
+                        <div className={`${theme.textPrimary} font-semibold text-sm`}>{Math.round(current.wind_speed_10m)} <span className="text-[10px] font-normal opacity-60">mph</span></div>
                     </div>
                     <div>
-                        <div className={`text-[10px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Humidity</div>
-                        <div className={`${theme.textPrimary} font-semibold text-lg`}>{current.relative_humidity_2m}<span className="text-xs font-normal opacity-60">%</span></div>
+                        <div className={`text-[8px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Humidity</div>
+                        <div className={`${theme.textPrimary} font-semibold text-sm`}>{current.relative_humidity_2m}<span className="text-[10px] font-normal opacity-60">%</span></div>
                     </div>
                     <div>
-                        <div className={`text-[10px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Precip</div>
-                        <div className={`${theme.textPrimary} font-semibold text-lg`}>{current.precipitation}<span className="text-xs font-normal opacity-60">"</span></div>
+                        <div className={`text-[8px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Precip</div>
+                        <div className={`${theme.textPrimary} font-semibold text-sm`}>{current.precipitation}<span className="text-[10px] font-normal opacity-60">"</span></div>
                     </div>
                 </div>
             </div>

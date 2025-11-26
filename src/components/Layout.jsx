@@ -22,6 +22,7 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
                     ? 'w-[1024px] h-[600px] border-8 border-gray-800 rounded-xl shadow-2xl bg-gray-900'
                     : 'w-full h-screen'
                     }`}
+                style={isPiMode ? { transform: 'scale(0.85)', transformOrigin: 'center' } : {}}
             >
                 {/* Background Elements (Inside Container) */}
                 <div className={`absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br ${theme.bgPrimary}`}>

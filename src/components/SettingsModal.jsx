@@ -47,13 +47,28 @@ const SettingsModal = ({ isOpen, onClose }) => {
         }
     };
 
+    const handleShutdown = async () => {
+        if (window.confirm('Are you sure you want to shutdown the Raspberry Pi? This will power off the device.')) {
+            try {
+                // Execute shutdown command
+                await fetch('/api/shutdown', { method: 'POST' });
+            } catch (error) {
+                console.error('Shutdown failed:', error);
+                alert('Failed to shutdown. Please try manually or check if running on Pi.');
+            }
+            onClose();
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-                <div className="p-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+                <div className="p-6 flex-shrink-0">
                     <h2 className="text-xl font-bold text-white mb-4">Settings</h2>
+                </div>
+                <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar">
                     <form onSubmit={handleSubmit} className="space-y-3">
 
                         {/* Keys Section */}
@@ -168,6 +183,17 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                             </svg>
                                             Quit
                                         </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleShutdown}
+                                            className="w-full px-4 py-3 rounded-lg bg-orange-600/20 hover:bg-orange-600/30 text-orange-300 hover:text-orange-200 transition-colors font-medium touch-manipulation flex items-center justify-center gap-2"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                            </svg>
+                                            Shutdown Pi
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -216,7 +242,7 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             )}
                         </div>
 
-                        <div className="flex justify-end space-x-3 mt-6">
+                        <div className="flex justify-end space-x-3 mt-6 sticky bottom-0 bg-gray-800 pt-4 -mx-6 px-6 border-t border-gray-700">
                             <button
                                 type="button"
                                 onClick={onClose}
