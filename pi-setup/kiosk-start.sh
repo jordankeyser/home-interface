@@ -37,8 +37,14 @@ xset s noblank
 # Hide mouse cursor after 3 seconds of inactivity
 unclutter -idle 3 &
 
-# Launch Chromium in kiosk mode
-chromium-browser \
+# Launch Chromium in kiosk mode (try both command names)
+if command -v chromium-browser &> /dev/null; then
+    CHROMIUM_CMD="chromium-browser"
+else
+    CHROMIUM_CMD="chromium"
+fi
+
+$CHROMIUM_CMD \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \

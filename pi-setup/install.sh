@@ -22,8 +22,18 @@ sudo apt upgrade -y
 
 # Install required packages
 echo "Step 2: Installing required packages..."
+
+# Try chromium-browser first, fall back to chromium
+if apt-cache show chromium-browser &> /dev/null; then
+    CHROMIUM_PKG="chromium-browser"
+else
+    CHROMIUM_PKG="chromium"
+fi
+
+echo "Installing Chromium package: $CHROMIUM_PKG"
+
 sudo apt install -y \
-    chromium-browser \
+    $CHROMIUM_PKG \
     unclutter \
     xdotool \
     x11-xserver-utils \
