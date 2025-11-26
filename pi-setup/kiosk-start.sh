@@ -10,11 +10,11 @@ done
 echo "Network is ready!"
 
 # Navigate to the app directory
-cd /home/pi/home-interface || exit 1
+cd /home/jordankeyser/Desktop/home-interface || exit 1
 
 # Start the Vite development server in the background
 echo "Starting Vite server..."
-npm start > /home/pi/home-interface/logs/vite.log 2>&1 &
+npm start > /home/jordankeyser/Desktop/home-interface/logs/vite.log 2>&1 &
 VITE_PID=$!
 
 # Wait for the server to be ready

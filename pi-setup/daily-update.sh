@@ -2,8 +2,8 @@
 # Daily Update Script - Pulls latest changes from git
 # This script runs once per day to update the application
 
-REPO_DIR="/home/pi/home-interface"
-LOG_FILE="/home/pi/home-interface/logs/update.log"
+REPO_DIR="/home/jordankeyser/Desktop/home-interface"
+LOG_FILE="/home/jordankeyser/Desktop/home-interface/logs/update.log"
 
 # Create logs directory if it doesn't exist
 mkdir -p "$(dirname "$LOG_FILE")"
