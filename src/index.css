@@ -167,12 +167,26 @@ body {
 * {
   -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
   -webkit-touch-callout: none;
+  /* Prevent text selection globally for touch devices */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection only in input fields */
+input, textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 /* Smooth scrolling with momentum on touch devices */
 .custom-scrollbar {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+  overscroll-behavior: contain;
 }
 
 /* Prevent text selection on UI elements */
@@ -185,6 +199,31 @@ button, .touch-manipulation {
 .overflow-y-auto, .overflow-x-auto {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
+  overscroll-behavior: contain;
+  /* Enable touch scrolling */
+  touch-action: pan-y pan-x;
+}
+
+/* Specific overrides for scrollable containers */
+.overflow-y-auto {
+  touch-action: pan-y;
+}
+
+.overflow-x-auto {
+  touch-action: pan-x;
+}
+
+/* Touch pan classes for explicit control */
+.touch-pan-y {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.touch-pan-x {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 /* Disable cursor for true kiosk mode */

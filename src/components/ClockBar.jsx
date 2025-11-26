@@ -28,7 +28,7 @@ const ClockBar = ({ onSettingsClick }) => {
             </div>
             <button
                 onClick={onSettingsClick}
-                className="p-3 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/20 transition-colors text-gray-400 hover:text-white active:text-white absolute right-6 touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center"
+                className="p-3 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/20 transition-colors text-gray-400 hover:text-white active:text-white absolute right-4 touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center"
                 aria-label="Open Settings"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

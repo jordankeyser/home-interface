@@ -1,8 +1,11 @@
 import React, { useMemo } from 'react';
 import { useWeather } from '../../../hooks/useWeather';
+import { useSettings } from '../../../context/SettingsContext';
 
 const WeatherModule = () => {
     const { weather, locationName, loading, error, refresh } = useWeather();
+    const { settings } = useSettings();
+    const isPiMode = settings.isPiMode;
 
     const getWeatherDescription = (code) => {
         const codes = {
@@ -156,33 +159,35 @@ const WeatherModule = () => {
         <div className="h-full w-full bg-gradient-to-br from-gray-900 to-blue-900 rounded-3xl border border-white/10 flex flex-col shadow-2xl relative overflow-hidden">
             {bgAnimation}
 
-            <div className="flex-grow flex flex-col items-center justify-center z-10 relative -mb-12">
+            <div className={`flex-grow flex flex-col items-center z-10 relative ${isPiMode ? 'justify-start pt-6' : 'justify-center -mb-12'}`}>
                 <div className="text-center">
-                    <h2 className="text-xl font-light text-white/80 mb-1 tracking-wide">{locationName}</h2>
-                    <div className="text-9xl leading-none font-bold text-white tracking-tighter drop-shadow-2xl">
+                    <h2 className={`font-light text-white/80 mb-1 tracking-wide ${isPiMode ? 'text-lg' : 'text-xl'}`}>{locationName}</h2>
+                    <div className={`leading-none font-bold text-white tracking-tighter drop-shadow-2xl ${isPiMode ? 'text-9xl' : 'text-8xl'}`}>
                         {Math.round(current.temperature_2m)}°
                     </div>
-                    <div className="text-xl text-blue-200 font-medium mt-2 uppercase tracking-widest">
+                    <div className={`text-blue-200 font-medium uppercase tracking-widest ${isPiMode ? 'text-lg mt-1' : 'text-xl mt-2'}`}>
                         {getWeatherDescription(current.weather_code)}
                     </div>
-                    <div className="text-base text-white/60 mt-1">
+                    <div className={`text-white/60 mt-1 ${isPiMode ? 'text-sm' : 'text-base'}`}>
                         H: {Math.round(daily.temperature_2m_max[0])}°  L: {Math.round(daily.temperature_2m_min[0])}°
                     </div>
                 </div>
 
                 <button
                     onClick={refresh}
-                    className="absolute top-4 right-4 p-3 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/20 text-white/50 hover:text-white active:text-white transition-all touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center"
+                    disabled={loading}
+                    className={`absolute top-4 right-4 p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : 'hover:text-blue-400'}`}
+                    title="Refresh Data"
                     aria-label="Refresh Weather Data"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                 </button>
             </div>
 
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-gray-950 via-gray-900/80 to-transparent pt-16 pb-4 px-4 z-20">
-                <div className="flex space-x-6 overflow-x-auto pb-2 justify-center mask-image-linear-gradient scrollbar-hide">
+                <div className="flex space-x-6 overflow-x-auto pb-2 justify-center mask-image-linear-gradient scrollbar-hide touch-pan-x">
                     {hourlyForecast.map((hour, idx) => (
                         <div key={idx} className="flex flex-col items-center space-y-1 min-w-[3rem]">
                             <span className="text-xs text-blue-200/80">{formatHour(hour.time)}</span>

@@ -130,9 +130,9 @@ const TrainModule = () => {
                     <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
                     {stationName ? `${stationName} Arrivals` : 'Train Arrivals'}
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center -space-x-1">
                     {lastUpdated && (
-                        <span className="text-[10px] text-gray-400 hidden sm:block">
+                        <span className="text-[10px] text-gray-400 hidden sm:block mr-1">
                             Updated: {lastUpdated.toLocaleTimeString()}
                         </span>
                     )}
@@ -140,16 +140,16 @@ const TrainModule = () => {
                     {/* Pause/Play Button */}
                     <button
                         onClick={togglePause}
-                        className={`p-3 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center ${isPaused ? 'text-yellow-400' : 'text-gray-300 hover:text-blue-400'}`}
+                        className={`p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${isPaused ? 'text-yellow-400' : 'text-gray-300 hover:text-blue-400'}`}
                         title={isPaused ? "Resume Updates" : "Pause Updates"}
                         aria-label={isPaused ? "Resume Updates" : "Pause Updates"}
                     >
                         {isPaused ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                             </svg>
                         ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
                         )}
@@ -158,18 +158,18 @@ const TrainModule = () => {
                     <button
                         onClick={refresh}
                         disabled={loading || isPaused}
-                        className={`p-3 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : 'hover:text-blue-400'}`}
+                        className={`p-1.5 rounded-full hover:bg-white/10 active:bg-white/20 transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : 'hover:text-blue-400'}`}
                         title="Refresh Data"
                         aria-label="Refresh Train Data"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </button>
                 </div>
             </div>
 
-            <div className="flex-grow overflow-y-auto space-y-4 pr-1 custom-scrollbar">
+            <div className="flex-grow overflow-y-auto space-y-4 pr-1 custom-scrollbar touch-pan-y">
                 {Object.keys(groupedArrivals).length === 0 ? (
                     <div className="text-center text-gray-500 mt-10">No trains scheduled</div>
                 ) : (
