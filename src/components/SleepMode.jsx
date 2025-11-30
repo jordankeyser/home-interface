@@ -1,22 +1,61 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const SleepMode = ({ children }) => {
-    const [isSleeping, setIsSleeping] = useState(false);
+    const [isSleeping, setIsSleeping] = useState(true); // Start in sleep mode
     const [isQuitting, setIsQuitting] = useState(false);
     const timeoutRef = useRef(null);
-    const IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+    const scheduleCheckRef = useRef(null);
+    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+    // Check if current time is within scheduled hours
+    const isScheduledWakeTime = useCallback(() => {
+        const now = new Date();
+        const day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        const currentTimeMinutes = hours * 60 + minutes;
+
+        // Sunday (0) and Saturday (6): never scheduled to be on
+        if (day === 0 || day === 6) {
+            return false;
+        }
+
+        // Monday - Friday (1-5): scheduled from 6:30 AM to 7:30 AM Central
+        if (day >= 1 && day <= 5) {
+            const scheduleStart = 6 * 60 + 30; // 6:30 AM in minutes
+            const scheduleEnd = 7 * 60 + 30; // 7:30 AM in minutes
+            return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
+        }
+
+        return false;
+    }, []);
 
     const resetIdleTimer = useCallback(() => {
-        if (isSleeping || isQuitting) return;
+        if (isQuitting) return;
 
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
         }
 
+        // Set timeout to go to sleep after 5 minutes of inactivity
         timeoutRef.current = setTimeout(() => {
             setIsSleeping(true);
         }, IDLE_TIMEOUT);
-    }, [isSleeping, isQuitting]);
+    }, [isQuitting, IDLE_TIMEOUT]);
+
+    // Check schedule and automatically wake/sleep
+    const checkSchedule = useCallback(() => {
+        const shouldBeAwake = isScheduledWakeTime();
+
+        if (shouldBeAwake && isSleeping) {
+            // Within scheduled time, wake up
+            setIsSleeping(false);
+            resetIdleTimer();
+        } else if (!shouldBeAwake && !isSleeping) {
+            // Outside scheduled time, check if we should sleep after idle timeout
+            // Don't force sleep immediately, let the idle timer handle it
+        }
+    }, [isScheduledWakeTime, isSleeping, resetIdleTimer]);
 
     const wakeUp = useCallback(() => {
         setIsSleeping(false);
@@ -55,6 +94,14 @@ const SleepMode = ({ children }) => {
             document.addEventListener(event, resetIdleTimer, true);
         });
 
+        // Check schedule immediately on mount
+        checkSchedule();
+
+        // Set up interval to check schedule every minute
+        scheduleCheckRef.current = setInterval(() => {
+            checkSchedule();
+        }, 60 * 1000); // Check every minute
+
         // Start the initial timer
         resetIdleTimer();
 
@@ -63,13 +110,16 @@ const SleepMode = ({ children }) => {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
             }
+            if (scheduleCheckRef.current) {
+                clearInterval(scheduleCheckRef.current);
+            }
             window.removeEventListener('enterSleepMode', handleSleepMode);
             window.removeEventListener('quitDashboard', handleQuit);
             events.forEach(event => {
                 document.removeEventListener(event, resetIdleTimer, true);
             });
         };
-    }, [resetIdleTimer, handleSleepMode, handleQuit]);
+    }, [resetIdleTimer, handleSleepMode, handleQuit, checkSchedule]);
 
     if (isQuitting) {
         return (
@@ -96,17 +146,10 @@ const SleepMode = ({ children }) => {
     if (isSleeping) {
         return (
             <div
-                className="min-h-screen w-full bg-black flex items-center justify-center cursor-pointer"
+                className="min-h-screen w-full bg-black cursor-pointer"
                 onClick={wakeUp}
                 onTouchStart={wakeUp}
-            >
-                <div className="text-center opacity-30 hover:opacity-50 transition-opacity">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-32 w-32 mx-auto text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                    </svg>
-                    <p className="text-2xl text-gray-600">Tap to wake</p>
-                </div>
-            </div>
+            />
         );
     }
 

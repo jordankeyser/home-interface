@@ -344,3 +344,4 @@ This setup provides a **production-ready touchscreen kiosk** that:
 **Everything you need is in the repository.** Just clone and run `install.sh` on your Pi!
 
 
+
