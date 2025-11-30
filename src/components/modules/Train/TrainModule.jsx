@@ -11,6 +11,8 @@ const TrainModule = () => {
     const [displayedArrivals, setDisplayedArrivals] = useState([]);
     const [exitingTrainIds, setExitingTrainIds] = useState(new Set());
     const prevArrivalsRef = useRef([]);
+    const moduleRef = useRef(null);
+    const scrollContainerRef = useRef(null);
 
     // Helper to calculate minutes until arrival
     const getMinutes = (arrivalString) => {
@@ -66,6 +68,41 @@ const TrainModule = () => {
         prevArrivalsRef.current = arrivals;
     }, [arrivals, loading, exitingTrainIds.size]);
 
+    // Enable scrolling from anywhere on the module
+    useEffect(() => {
+        const moduleElement = moduleRef.current;
+        const scrollContainer = scrollContainerRef.current;
+
+        if (!moduleElement || !scrollContainer) return;
+
+        const handleWheel = (e) => {
+            // Prevent default scrolling behavior
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Scroll the container
+            scrollContainer.scrollTop += e.deltaY;
+        };
+
+        moduleElement.addEventListener('wheel', handleWheel, { passive: false });
+
+        return () => {
+            moduleElement.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
+
+    // Refresh data when waking from sleep
+    useEffect(() => {
+        const handleWakeFromSleep = () => {
+            refresh();
+        };
+
+        window.addEventListener('wakeFromSleep', handleWakeFromSleep);
+
+        return () => {
+            window.removeEventListener('wakeFromSleep', handleWakeFromSleep);
+        };
+    }, [refresh]);
 
     // Group arrivals by destination/direction
     const groupedArrivals = useMemo(() => {
@@ -126,7 +163,7 @@ const TrainModule = () => {
     }
 
     return (
-        <div className={`h-full w-full ${theme.moduleBg} rounded-3xl ${theme.border} border p-4 flex flex-col shadow-xl relative overflow-hidden`}>
+        <div ref={moduleRef} className={`h-full w-full ${theme.moduleBg} rounded-3xl ${theme.border} border p-4 flex flex-col shadow-xl relative overflow-hidden`}>
 
             <div className="flex justify-between items-center mb-2">
                 <h2 className={`text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
@@ -172,7 +209,7 @@ const TrainModule = () => {
                 </div>
             </div>
 
-            <div className="flex-grow overflow-y-auto space-y-4 pr-1 custom-scrollbar touch-pan-y">
+            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto space-y-4 pr-2 custom-scrollbar touch-pan-y">
                 {Object.keys(groupedArrivals).length === 0 ? (
                     <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (

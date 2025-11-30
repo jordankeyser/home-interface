@@ -231,6 +231,13 @@ body.kiosk-mode {
   cursor: none;
 }
 
+/* Sleep mode - completely black screen */
+.sleep-mode-screen {
+  background-color: #000000 !important;
+  filter: brightness(0) !important;
+  opacity: 0 !important;
+}
+
 /* Optional: Hide cursor after inactivity */
 @media (pointer: coarse) {
   /* Touch device specific styles */

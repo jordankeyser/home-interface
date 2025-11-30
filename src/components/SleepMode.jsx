@@ -60,6 +60,9 @@ const SleepMode = ({ children }) => {
     const wakeUp = useCallback(() => {
         setIsSleeping(false);
         resetIdleTimer();
+
+        // Dispatch a custom event to refresh all data when waking up
+        window.dispatchEvent(new CustomEvent('wakeFromSleep'));
     }, [resetIdleTimer]);
 
     const handleSleepMode = useCallback(() => {
@@ -146,7 +149,7 @@ const SleepMode = ({ children }) => {
     if (isSleeping) {
         return (
             <div
-                className="min-h-screen w-full bg-black cursor-pointer"
+                className="min-h-screen w-full cursor-pointer sleep-mode-screen"
                 onClick={wakeUp}
                 onTouchStart={wakeUp}
             />

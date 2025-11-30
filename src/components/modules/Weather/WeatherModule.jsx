@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useWeather } from '../../../hooks/useWeather';
 import { useSettings } from '../../../context/SettingsContext';
 
@@ -7,6 +7,8 @@ const WeatherModule = () => {
     const { settings, currentTheme } = useSettings();
     const isPiMode = settings.isPiMode;
     const theme = currentTheme.colors;
+    const forecastRef = React.useRef(null);
+    const forecastContainerRef = React.useRef(null);
 
     const getWeatherDescription = (code) => {
         const codes = {
@@ -136,6 +138,42 @@ const WeatherModule = () => {
         return hours;
     }, [weather]);
 
+    // Enable horizontal scrolling of forecast from anywhere on the forecast area
+    useEffect(() => {
+        const forecastElement = forecastRef.current;
+        const scrollContainer = forecastContainerRef.current;
+
+        if (!forecastElement || !scrollContainer) return;
+
+        const handleWheel = (e) => {
+            // Prevent default scrolling behavior
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Scroll horizontally
+            scrollContainer.scrollLeft += e.deltaY;
+        };
+
+        forecastElement.addEventListener('wheel', handleWheel, { passive: false });
+
+        return () => {
+            forecastElement.removeEventListener('wheel', handleWheel);
+        };
+    }, []);
+
+    // Refresh data when waking from sleep
+    useEffect(() => {
+        const handleWakeFromSleep = () => {
+            refresh();
+        };
+
+        window.addEventListener('wakeFromSleep', handleWakeFromSleep);
+
+        return () => {
+            window.removeEventListener('wakeFromSleep', handleWakeFromSleep);
+        };
+    }, [refresh]);
+
     if (loading && !weather) {
         return (
             <div className={`h-full w-full flex items-center justify-center ${theme.moduleBg} rounded-3xl ${theme.border} border p-6 animate-pulse`}>
@@ -191,8 +229,8 @@ const WeatherModule = () => {
                 </button>
             </div>
 
-            <div className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${theme.bgTertiary === 'bg-gray-100' ? 'from-gray-200 via-gray-100/90' : 'from-gray-950 via-gray-900/80'} to-transparent pt-8 pb-2 px-2 z-20`}>
-                <div className="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide touch-pan-x" style={{ scrollSnapType: 'x mandatory' }}>
+            <div ref={forecastRef} className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${theme.bgTertiary === 'bg-gray-100' ? 'from-gray-200 via-gray-100/90' : 'from-gray-950 via-gray-900/80'} to-transparent pt-8 pb-2 px-2 z-20`}>
+                <div ref={forecastContainerRef} className="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide touch-pan-x" style={{ scrollSnapType: 'x mandatory' }}>
                     {hourlyForecast.map((hour, idx) => (
                         <div key={idx} className="flex flex-col items-center space-y-0.5 min-w-[2rem] flex-shrink-0" style={{ scrollSnapAlign: 'start' }}>
                             <span className={`text-[9px] ${theme.textAccent} opacity-80`}>{formatHour(hour.time)}</span>

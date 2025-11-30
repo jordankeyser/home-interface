@@ -11,6 +11,19 @@ const ClockBar = ({ onSettingsClick }) => {
         return () => clearInterval(timer);
     }, []);
 
+    // Refresh time immediately when waking from sleep
+    useEffect(() => {
+        const handleWakeFromSleep = () => {
+            setTime(new Date());
+        };
+
+        window.addEventListener('wakeFromSleep', handleWakeFromSleep);
+
+        return () => {
+            window.removeEventListener('wakeFromSleep', handleWakeFromSleep);
+        };
+    }, []);
+
     const formatTime = (date) => {
         return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     };
@@ -21,7 +34,7 @@ const ClockBar = ({ onSettingsClick }) => {
 
     return (
         <div className={`w-full ${theme.moduleBg} border-b ${theme.border} p-6 flex justify-between items-center shadow-lg mb-3 rounded-xl`}>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-1">
                 <div className={`text-3xl font-bold ${theme.textPrimary} tracking-tight leading-none`}>
                     {formatTime(time)}
                 </div>
