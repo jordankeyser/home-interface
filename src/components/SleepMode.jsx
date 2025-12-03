@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
+// Control the physical display power via the display server
+const turnDisplayOff = () => {
+    fetch('http://localhost:3001/display/off', { method: 'POST' }).catch(() => {});
+};
+
+const turnDisplayOn = () => {
+    fetch('http://localhost:3001/display/on', { method: 'POST' }).catch(() => {});
+};
+
 const SleepMode = ({ children }) => {
     const [isSleeping, setIsSleeping] = useState(true); // Start in sleep mode
     const [isQuitting, setIsQuitting] = useState(false);
@@ -40,6 +49,7 @@ const SleepMode = ({ children }) => {
         // Set timeout to go to sleep after 5 minutes of inactivity
         timeoutRef.current = setTimeout(() => {
             setIsSleeping(true);
+            turnDisplayOff();
         }, IDLE_TIMEOUT);
     }, [isQuitting, IDLE_TIMEOUT]);
 
@@ -58,6 +68,7 @@ const SleepMode = ({ children }) => {
     }, [isScheduledWakeTime, isSleeping, resetIdleTimer]);
 
     const wakeUp = useCallback(() => {
+        turnDisplayOn();
         setIsSleeping(false);
         resetIdleTimer();
 
@@ -67,6 +78,7 @@ const SleepMode = ({ children }) => {
 
     const handleSleepMode = useCallback(() => {
         setIsSleeping(true);
+        turnDisplayOff();
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
         }
@@ -96,6 +108,9 @@ const SleepMode = ({ children }) => {
         events.forEach(event => {
             document.addEventListener(event, resetIdleTimer, true);
         });
+
+        // Turn off display on initial mount since we start in sleep mode
+        turnDisplayOff();
 
         // Check schedule immediately on mount
         checkSchedule();
