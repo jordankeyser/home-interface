@@ -14,7 +14,7 @@ const SleepMode = ({ children }) => {
     const [isQuitting, setIsQuitting] = useState(false);
     const timeoutRef = useRef(null);
     const scheduleCheckRef = useRef(null);
-    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds
 
     // Check if current time is within scheduled hours
     const isScheduledWakeTime = useCallback(() => {
