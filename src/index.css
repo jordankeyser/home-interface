@@ -231,11 +231,9 @@ body.kiosk-mode {
   cursor: none;
 }
 
-/* Sleep mode - completely black screen */
+/* Sleep mode - black screen (touch still works) */
 .sleep-mode-screen {
   background-color: #000000 !important;
-  filter: brightness(0) !important;
-  opacity: 0 !important;
 }
 
 /* Optional: Hide cursor after inactivity */

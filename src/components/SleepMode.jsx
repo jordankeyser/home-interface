@@ -10,11 +10,11 @@ const turnDisplayOn = () => {
 };
 
 const SleepMode = ({ children }) => {
-    const [isSleeping, setIsSleeping] = useState(true); // Start in sleep mode
+    const [isSleeping, setIsSleeping] = useState(false); // Start awake
     const [isQuitting, setIsQuitting] = useState(false);
     const timeoutRef = useRef(null);
     const scheduleCheckRef = useRef(null);
-    const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds
+    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
     // Check if current time is within scheduled hours
     const isScheduledWakeTime = useCallback(() => {
@@ -108,9 +108,6 @@ const SleepMode = ({ children }) => {
         events.forEach(event => {
             document.addEventListener(event, resetIdleTimer, true);
         });
-
-        // Turn off display on initial mount since we start in sleep mode
-        turnDisplayOff();
 
         // Check schedule immediately on mount
         checkSchedule();
