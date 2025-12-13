@@ -68,26 +68,42 @@ const TrainModule = () => {
         prevArrivalsRef.current = arrivals;
     }, [arrivals, loading, exitingTrainIds.size]);
 
-    // Enable scrolling from anywhere on the module
+    // Enable scrolling from anywhere on the module (wheel + touch)
     useEffect(() => {
         const moduleElement = moduleRef.current;
         const scrollContainer = scrollContainerRef.current;
 
         if (!moduleElement || !scrollContainer) return;
 
+        let touchStartY = 0;
+        let touchStartScrollTop = 0;
+
         const handleWheel = (e) => {
-            // Prevent default scrolling behavior
             e.preventDefault();
             e.stopPropagation();
-
-            // Scroll the container
             scrollContainer.scrollTop += e.deltaY;
         };
 
+        const handleTouchStart = (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartScrollTop = scrollContainer.scrollTop;
+        };
+
+        const handleTouchMove = (e) => {
+            const touchY = e.touches[0].clientY;
+            const deltaY = touchStartY - touchY;
+            scrollContainer.scrollTop = touchStartScrollTop + deltaY;
+            e.preventDefault();
+        };
+
         moduleElement.addEventListener('wheel', handleWheel, { passive: false });
+        moduleElement.addEventListener('touchstart', handleTouchStart, { passive: true });
+        moduleElement.addEventListener('touchmove', handleTouchMove, { passive: false });
 
         return () => {
             moduleElement.removeEventListener('wheel', handleWheel);
+            moduleElement.removeEventListener('touchstart', handleTouchStart);
+            moduleElement.removeEventListener('touchmove', handleTouchMove);
         };
     }, []);
 
@@ -209,7 +225,7 @@ const TrainModule = () => {
                 </div>
             </div>
 
-            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto space-y-4 pr-2 custom-scrollbar touch-pan-y">
+            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-4 pr-2 custom-scrollbar">
                 {Object.keys(groupedArrivals).length === 0 ? (
                     <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (
