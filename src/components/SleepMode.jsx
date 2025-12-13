@@ -14,7 +14,7 @@ const SleepMode = ({ children }) => {
     const [isQuitting, setIsQuitting] = useState(false);
     const timeoutRef = useRef(null);
     const scheduleCheckRef = useRef(null);
-    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds
 
     // Check if current time is within scheduled hours (Central Time - ensure Pi is set to America/Chicago)
     const isScheduledWakeTime = useCallback(() => {
@@ -60,17 +60,12 @@ const SleepMode = ({ children }) => {
             clearTimeout(timeoutRef.current);
         }
 
-        // During scheduled wake time, don't set sleep timer - stay awake
-        if (isScheduledWakeTime()) {
-            return;
-        }
-
-        // Set timeout to go to sleep after 5 minutes of inactivity
+        // Set timeout to go to sleep after 2 minutes of inactivity (regardless of schedule)
         timeoutRef.current = setTimeout(() => {
             setIsSleeping(true);
             turnDisplayOff();
         }, IDLE_TIMEOUT);
-    }, [isQuitting, IDLE_TIMEOUT, isScheduledWakeTime]);
+    }, [isQuitting, IDLE_TIMEOUT]);
 
     // Check schedule and automatically wake/sleep
     const checkSchedule = useCallback(() => {

@@ -36,32 +36,32 @@ export const themes = {
     id: 'light',
     name: 'Light Mode',
     colors: {
-      // Background
-      bgPrimary: 'from-gray-100 via-white to-gray-200',
-      bgSecondary: 'bg-black/5',
-      bgTertiary: 'bg-gray-100',
+      // Background - clean white with subtle cool tones
+      bgPrimary: 'from-slate-50 via-white to-zinc-50',
+      bgSecondary: 'bg-slate-100',
+      bgTertiary: 'bg-white',
 
-      // Text
-      textPrimary: 'text-gray-900',
-      textSecondary: 'text-gray-600',
-      textAccent: 'text-blue-600',
+      // Text - high contrast with modern slate tones
+      textPrimary: 'text-slate-900',
+      textSecondary: 'text-slate-500',
+      textAccent: 'text-indigo-600',
 
-      // Borders
-      border: 'border-black/10',
-      borderAccent: 'border-blue-600',
+      // Borders - subtle and refined
+      border: 'border-slate-200',
+      borderAccent: 'border-indigo-500',
 
-      // Module backgrounds
-      moduleBg: 'bg-white/80 backdrop-blur-md',
-      moduleHover: 'hover:bg-black/5',
+      // Module backgrounds - glass-like with subtle shadow
+      moduleBg: 'bg-white shadow-lg shadow-slate-200/50 border border-slate-100',
+      moduleHover: 'hover:bg-slate-50',
 
-      // Buttons
-      buttonBg: 'bg-black/5',
-      buttonHover: 'hover:bg-black/10',
-      buttonActive: 'active:bg-black/20',
+      // Buttons - clean and minimal
+      buttonBg: 'bg-slate-100',
+      buttonHover: 'hover:bg-slate-200',
+      buttonActive: 'active:bg-slate-300',
 
-      // Accent colors
-      accent: 'blue',
-      accentColor: 'bg-blue-600'
+      // Accent colors - modern indigo
+      accent: 'indigo',
+      accentColor: 'bg-indigo-500'
     }
   },
 

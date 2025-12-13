@@ -120,7 +120,7 @@ const TrainModule = () => {
         };
     }, [refresh]);
 
-    // Group arrivals by destination/direction
+    // Group arrivals by destination/direction and sort by arrival time
     const groupedArrivals = useMemo(() => {
         const groups = {};
         // Use displayedArrivals instead of raw arrivals
@@ -130,6 +130,10 @@ const TrainModule = () => {
                 groups[key] = [];
             }
             groups[key].push(train);
+        });
+        // Sort each group by arrival time (soonest first)
+        Object.keys(groups).forEach(key => {
+            groups[key].sort((a, b) => new Date(a.arrT) - new Date(b.arrT));
         });
         return groups;
     }, [displayedArrivals]);
@@ -225,7 +229,7 @@ const TrainModule = () => {
                 </div>
             </div>
 
-            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-4 pr-2 custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-3 pr-3 custom-scrollbar">
                 {Object.keys(groupedArrivals).length === 0 ? (
                     <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (
@@ -234,7 +238,7 @@ const TrainModule = () => {
                             <h3 className={`text-xs font-medium ${theme.textSecondary} uppercase tracking-wider mb-2 border-b ${theme.border} pb-1`}>
                                 {direction}
                             </h3>
-                            <div className="space-y-2 relative">
+                            <div className="space-y-1 relative">
                                 {trains.slice(0, 3).map((train) => {
                                     const mins = getMinutes(train.arrT);
                                     const isDue = mins === 'Due';
@@ -243,25 +247,15 @@ const TrainModule = () => {
                                     return (
                                         <div
                                             key={train.rn}
-                                            className={`flex items-center justify-between ${theme.bgSecondary} p-2 rounded-lg ${theme.moduleHover} transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
+                                            className={`flex items-center justify-between ${theme.bgSecondary} px-2 py-1.5 rounded-lg ${theme.moduleHover} transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
                                         >
-                                            <div className="flex items-center gap-3">
-                                                {/* Line Color Badge (No Text) */}
-                                                <div className={`w-2 h-6 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
-
-                                                <div>
-                                                    <div className={`font-bold ${theme.textPrimary} text-base leading-tight`}>{train.destNm}</div>
-                                                    <div className={`text-[10px] ${theme.textSecondary}`}>Run #{train.rn}</div>
-                                                </div>
+                                            <div className="flex items-center gap-2">
+                                                {/* Line Color Badge */}
+                                                <div className={`w-1.5 h-5 rounded-full ${getLineColor(train.rt)}`}></div>
+                                                <div className={`font-semibold ${theme.textPrimary} text-sm`}>{train.destNm}</div>
                                             </div>
-                                            <div className="text-right">
-                                                <div className={`text-xl font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
-                                                    {isDue ? 'Due' : mins}
-                                                </div>
-                                                <div className={`text-[10px] ${theme.textSecondary}`}>
-                                                    {!isDue && <span className="mr-1 opacity-70">est</span>}
-                                                    {formatTime(train.arrT)}
-                                                </div>
+                                            <div className={`text-base font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
+                                                {isDue ? 'Due' : mins}
                                             </div>
                                         </div>
                                     );
