@@ -156,14 +156,14 @@ body {
 
 /* Thick scrollbar for touch devices */
 .custom-scrollbar::-webkit-scrollbar {
-  height: 20px;
-  width: 20px;
+  height: 16px;
+  width: 16px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  margin: 0;
+  border-radius: 8px;
+  margin: 4px 0;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
