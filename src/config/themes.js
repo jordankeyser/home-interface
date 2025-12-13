@@ -13,13 +13,13 @@ export const themes = {
       textSecondary: 'text-gray-400',
       textAccent: 'text-blue-400',
 
-      // Borders
-      border: 'border-white/10',
+      // Borders - more pronounced
+      border: 'border-white/30',
       borderAccent: 'border-blue-500',
 
       // Module backgrounds
-      moduleBg: 'bg-white/5 backdrop-blur-md',
-      moduleHover: 'hover:bg-white/10',
+      moduleBg: 'bg-white/10 backdrop-blur-md',
+      moduleHover: 'hover:bg-white/15',
 
       // Buttons
       buttonBg: 'bg-white/5',
@@ -46,13 +46,13 @@ export const themes = {
       textSecondary: 'text-slate-500',
       textAccent: 'text-indigo-600',
 
-      // Borders - subtle and refined
-      border: 'border-slate-300',
+      // Borders - more pronounced
+      border: 'border-slate-400',
       borderAccent: 'border-indigo-500',
 
-      // Module backgrounds - clean with subtle shadow
-      moduleBg: 'bg-white/90 backdrop-blur-md shadow-lg shadow-slate-300/30',
-      moduleHover: 'hover:bg-slate-100',
+      // Module backgrounds - clean with shadow and visible border
+      moduleBg: 'bg-white/95 backdrop-blur-md shadow-xl shadow-slate-400/20',
+      moduleHover: 'hover:bg-slate-50',
 
       // Buttons - clean and minimal
       buttonBg: 'bg-slate-100',
@@ -79,12 +79,12 @@ export const themes = {
       textSecondary: 'text-purple-300',
       textAccent: 'text-cyan-400',
 
-      // Borders
-      border: 'border-pink-500/30',
+      // Borders - more pronounced
+      border: 'border-pink-500/50',
       borderAccent: 'border-cyan-400',
 
       // Module backgrounds
-      moduleBg: 'bg-purple-900/50 backdrop-blur-md',
+      moduleBg: 'bg-purple-900/60 backdrop-blur-md',
       moduleHover: 'hover:bg-pink-500/20',
 
       // Buttons
@@ -112,12 +112,12 @@ export const themes = {
       textSecondary: 'text-orange-700',
       textAccent: 'text-red-600',
 
-      // Borders
-      border: 'border-amber-300',
+      // Borders - more pronounced
+      border: 'border-amber-500',
       borderAccent: 'border-red-600',
 
       // Module backgrounds
-      moduleBg: 'bg-amber-100/80 backdrop-blur-sm',
+      moduleBg: 'bg-amber-100/90 backdrop-blur-sm shadow-lg shadow-amber-400/20',
       moduleHover: 'hover:bg-amber-200/60',
 
       // Buttons
@@ -145,13 +145,13 @@ export const themes = {
       textSecondary: 'text-gray-700',
       textAccent: 'text-blue-700',
 
-      // Borders
-      border: 'border-gray-500',
+      // Borders - more pronounced
+      border: 'border-gray-600',
       borderAccent: 'border-blue-700',
 
       // Module backgrounds
-      moduleBg: 'bg-gray-200/90 backdrop-blur-sm',
-      moduleHover: 'hover:bg-gray-300/70',
+      moduleBg: 'bg-gray-100/95 backdrop-blur-sm shadow-lg shadow-gray-500/20',
+      moduleHover: 'hover:bg-gray-200/70',
 
       // Buttons
       buttonBg: 'bg-gray-300',
