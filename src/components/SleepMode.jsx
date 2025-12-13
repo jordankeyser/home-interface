@@ -16,7 +16,7 @@ const SleepMode = ({ children }) => {
     const scheduleCheckRef = useRef(null);
     const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-    // Check if current time is within scheduled hours
+    // Check if current time is within scheduled hours (Central Time - ensure Pi is set to America/Chicago)
     const isScheduledWakeTime = useCallback(() => {
         const now = new Date();
         const day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -24,15 +24,29 @@ const SleepMode = ({ children }) => {
         const minutes = now.getMinutes();
         const currentTimeMinutes = hours * 60 + minutes;
 
-        // Sunday (0) and Saturday (6): never scheduled to be on
-        if (day === 0 || day === 6) {
+        // Sunday (0): not automatically on unless clicked
+        if (day === 0) {
             return false;
         }
 
-        // Monday - Friday (1-5): scheduled from 6:30 AM to 7:30 AM Central
-        if (day >= 1 && day <= 5) {
-            const scheduleStart = 6 * 60 + 30; // 6:30 AM in minutes
-            const scheduleEnd = 7 * 60 + 30; // 7:30 AM in minutes
+        // Monday - Thursday (1-4): 6:45 AM - 7:45 AM
+        if (day >= 1 && day <= 4) {
+            const scheduleStart = 6 * 60 + 45; // 6:45 AM in minutes
+            const scheduleEnd = 7 * 60 + 45; // 7:45 AM in minutes
+            return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
+        }
+
+        // Friday (5): 8:00 AM - 10:00 AM
+        if (day === 5) {
+            const scheduleStart = 8 * 60; // 8:00 AM in minutes
+            const scheduleEnd = 10 * 60; // 10:00 AM in minutes
+            return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
+        }
+
+        // Saturday (6): 8:00 AM - 10:00 AM
+        if (day === 6) {
+            const scheduleStart = 8 * 60; // 8:00 AM in minutes
+            const scheduleEnd = 10 * 60; // 10:00 AM in minutes
             return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
         }
 
@@ -46,24 +60,30 @@ const SleepMode = ({ children }) => {
             clearTimeout(timeoutRef.current);
         }
 
+        // During scheduled wake time, don't set sleep timer - stay awake
+        if (isScheduledWakeTime()) {
+            return;
+        }
+
         // Set timeout to go to sleep after 5 minutes of inactivity
         timeoutRef.current = setTimeout(() => {
             setIsSleeping(true);
             turnDisplayOff();
         }, IDLE_TIMEOUT);
-    }, [isQuitting, IDLE_TIMEOUT]);
+    }, [isQuitting, IDLE_TIMEOUT, isScheduledWakeTime]);
 
     // Check schedule and automatically wake/sleep
     const checkSchedule = useCallback(() => {
         const shouldBeAwake = isScheduledWakeTime();
 
         if (shouldBeAwake && isSleeping) {
-            // Within scheduled time, wake up
+            // Within scheduled time, wake up and turn on display
+            turnDisplayOn();
             setIsSleeping(false);
-            resetIdleTimer();
+            window.dispatchEvent(new CustomEvent('wakeFromSleep'));
         } else if (!shouldBeAwake && !isSleeping) {
-            // Outside scheduled time, check if we should sleep after idle timeout
-            // Don't force sleep immediately, let the idle timer handle it
+            // Outside scheduled time, start idle timer if not already running
+            resetIdleTimer();
         }
     }, [isScheduledWakeTime, isSleeping, resetIdleTimer]);
 
