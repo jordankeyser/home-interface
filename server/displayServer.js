@@ -56,6 +56,13 @@ const turnOnDisplay = () => {
     });
 };
 
+const shutdownPi = () => {
+    console.log('Initiating shutdown...');
+    exec('sudo shutdown now', (err) => {
+        if (err) console.log('Shutdown failed:', err.message);
+    });
+};
+
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -75,6 +82,10 @@ const server = http.createServer((req, res) => {
         turnOnDisplay();
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, action: 'display_on' }));
+    } else if (req.method === 'POST' && req.url === '/shutdown') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, action: 'shutdown' }));
+        shutdownPi();
     } else {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Not found' }));

@@ -34,7 +34,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
     };
 
     const handleSleep = () => {
-        // Dispatch custom event for sleep mode
+        // Turn off display via display server and enter sleep mode
+        fetch('http://localhost:3001/display/off', { method: 'POST' }).catch(() => {});
         window.dispatchEvent(new CustomEvent('enterSleepMode'));
         onClose();
     };
@@ -50,8 +51,8 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const handleShutdown = async () => {
         if (window.confirm('Are you sure you want to shutdown the Raspberry Pi? This will power off the device.')) {
             try {
-                // Execute shutdown command
-                await fetch('/api/shutdown', { method: 'POST' });
+                // Execute shutdown via display server
+                await fetch('http://localhost:3001/shutdown', { method: 'POST' });
             } catch (error) {
                 console.error('Shutdown failed:', error);
                 alert('Failed to shutdown. Please try manually or check if running on Pi.');
@@ -63,13 +64,12 @@ const SettingsModal = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl w-full max-w-md max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
-                <div className="p-6 flex-shrink-0">
-                    <h2 className="text-xl font-bold text-white mb-4">Settings</h2>
-                </div>
-                <div className="flex-1 overflow-y-auto px-6 pb-6 custom-scrollbar">
-                    <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="fixed inset-0 z-50 flex flex-col bg-gray-800">
+            <div className="p-4 flex-shrink-0 border-b border-gray-700">
+                <h2 className="text-xl font-bold text-white">Settings</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <form onSubmit={handleSubmit} className="space-y-3">
 
                         {/* Keys Section */}
                         <div className="border border-gray-700 rounded-lg overflow-hidden">
@@ -242,23 +242,23 @@ const SettingsModal = ({ isOpen, onClose }) => {
                             )}
                         </div>
 
-                        <div className="flex justify-end space-x-3 mt-6 sticky bottom-0 bg-gray-800 pt-4 -mx-6 px-6 border-t border-gray-700">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-6 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 transition-colors touch-manipulation min-h-[48px]"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-700 transition-colors font-medium touch-manipulation min-h-[48px]"
-                            >
-                                Save Changes
-                            </button>
-                        </div>
                     </form>
                 </div>
+            <div className="flex-shrink-0 p-4 border-t border-gray-700 bg-gray-800 flex justify-end space-x-3">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-6 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 transition-colors touch-manipulation min-h-[48px]"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="button"
+                    onClick={handleSubmit}
+                    className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-500 active:bg-blue-700 transition-colors font-medium touch-manipulation min-h-[48px]"
+                >
+                    Save Changes
+                </button>
             </div>
         </div>
     );
