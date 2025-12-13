@@ -37,8 +37,8 @@ export const themes = {
     name: 'Light Mode',
     colors: {
       // Background - clean white with subtle cool tones
-      bgPrimary: 'from-slate-50 via-white to-zinc-50',
-      bgSecondary: 'bg-slate-100',
+      bgPrimary: 'from-slate-100 via-white to-slate-50',
+      bgSecondary: 'bg-slate-200/80',
       bgTertiary: 'bg-white',
 
       // Text - high contrast with modern slate tones
@@ -47,12 +47,12 @@ export const themes = {
       textAccent: 'text-indigo-600',
 
       // Borders - subtle and refined
-      border: 'border-slate-200',
+      border: 'border-slate-300',
       borderAccent: 'border-indigo-500',
 
-      // Module backgrounds - glass-like with subtle shadow
-      moduleBg: 'bg-white shadow-lg shadow-slate-200/50 border border-slate-100',
-      moduleHover: 'hover:bg-slate-50',
+      // Module backgrounds - clean with subtle shadow
+      moduleBg: 'bg-white/90 backdrop-blur-md shadow-lg shadow-slate-300/30',
+      moduleHover: 'hover:bg-slate-100',
 
       // Buttons - clean and minimal
       buttonBg: 'bg-slate-100',
