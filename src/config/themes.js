@@ -18,8 +18,8 @@ export const themes = {
       borderAccent: 'border-blue-500',
 
       // Module backgrounds
-      moduleBg: 'bg-white/10 backdrop-blur-md',
-      moduleHover: 'hover:bg-white/15',
+      moduleBg: 'bg-white/5 backdrop-blur-md',
+      moduleHover: 'hover:bg-white/10',
 
       // Buttons
       buttonBg: 'bg-white/5',
@@ -50,9 +50,9 @@ export const themes = {
       border: 'border-slate-400',
       borderAccent: 'border-indigo-500',
 
-      // Module backgrounds - clean with shadow and visible border
-      moduleBg: 'bg-white/95 backdrop-blur-md shadow-xl shadow-slate-400/20',
-      moduleHover: 'hover:bg-slate-50',
+      // Module backgrounds
+      moduleBg: 'bg-white/80 backdrop-blur-md',
+      moduleHover: 'hover:bg-white/90',
 
       // Buttons - clean and minimal
       buttonBg: 'bg-slate-100',
@@ -117,7 +117,7 @@ export const themes = {
       borderAccent: 'border-red-600',
 
       // Module backgrounds
-      moduleBg: 'bg-amber-100/90 backdrop-blur-sm shadow-lg shadow-amber-400/20',
+      moduleBg: 'bg-amber-100/80 backdrop-blur-sm',
       moduleHover: 'hover:bg-amber-200/60',
 
       // Buttons
@@ -150,8 +150,8 @@ export const themes = {
       borderAccent: 'border-blue-700',
 
       // Module backgrounds
-      moduleBg: 'bg-gray-100/95 backdrop-blur-sm shadow-lg shadow-gray-500/20',
-      moduleHover: 'hover:bg-gray-200/70',
+      moduleBg: 'bg-gray-200/90 backdrop-blur-sm',
+      moduleHover: 'hover:bg-gray-300/70',
 
       // Buttons
       buttonBg: 'bg-gray-300',
