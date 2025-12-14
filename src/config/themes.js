@@ -170,7 +170,7 @@ export const themes = {
     colors: {
       // Background - deep dark mode with a modern, multi-accent undertone
       // (Use arbitrary hex to avoid washed-out Tailwind grays on large displays.)
-      bgPrimary: 'from-[#03040A] via-[#060B18] to-[#010208]',
+      bgPrimary: 'from-[#05060A] via-[#080F1F] to-[#020409]',
       bgSecondary: 'bg-white/6',
       bgTertiary: 'bg-black/40',
 
@@ -190,9 +190,10 @@ export const themes = {
 
       // New: consistent card styling (depth without relying on outer shadows)
       moduleCard:
-        'rounded-3xl bg-gradient-to-b from-white/[0.14] via-white/[0.07] to-white/[0.035] backdrop-blur-xl ring-1 ring-white/18 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.35),0_18px_70px_rgba(0,0,0,0.78)]',
+        'rounded-3xl bg-gradient-to-b from-white/[0.11] via-white/[0.06] to-white/[0.03] backdrop-blur-xl ring-1 ring-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_14px_50px_rgba(0,0,0,0.68)] ' +
+        'transition-[transform,background,box-shadow] duration-300 ease-out hover:-translate-y-[1px] hover:ring-white/22 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_70px_rgba(0,0,0,0.72)]',
       moduleCardInner:
-        'bg-black/30 ring-1 ring-white/14',
+        'bg-black/28 ring-1 ring-white/12',
       moduleDivider:
         'bg-gradient-to-r from-transparent via-white/15 to-transparent',
 
