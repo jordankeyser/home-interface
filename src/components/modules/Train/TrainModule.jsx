@@ -120,6 +120,14 @@ const TrainModule = () => {
         };
     }, [refresh]);
 
+    // Determine if Loop should be first based on day of week
+    const isLoopFirst = useMemo(() => {
+        const day = new Date().getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        // Monday-Thursday (1-4): Loop first
+        // Friday-Sunday (5, 6, 0): Kimball first
+        return day >= 1 && day <= 4;
+    }, []);
+
     // Group arrivals by destination/direction and sort by arrival time
     const groupedArrivals = useMemo(() => {
         const groups = {};
@@ -137,6 +145,26 @@ const TrainModule = () => {
         });
         return groups;
     }, [displayedArrivals]);
+
+    // Sort direction groups based on day of week
+    const sortedDirections = useMemo(() => {
+        const entries = Object.entries(groupedArrivals);
+        return entries.sort((a, b) => {
+            const aIsLoop = a[0].toLowerCase().includes('loop');
+            const bIsLoop = b[0].toLowerCase().includes('loop');
+
+            if (isLoopFirst) {
+                // Loop should be first (Mon-Thu)
+                if (aIsLoop && !bIsLoop) return -1;
+                if (!aIsLoop && bIsLoop) return 1;
+            } else {
+                // Kimball should be first (Fri-Sun)
+                if (aIsLoop && !bIsLoop) return 1;
+                if (!aIsLoop && bIsLoop) return -1;
+            }
+            return 0;
+        });
+    }, [groupedArrivals, isLoopFirst]);
 
     // Helper to format time
     const formatTime = (dateString) => {
@@ -230,10 +258,10 @@ const TrainModule = () => {
             </div>
 
             <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-4 pr-4 custom-scrollbar">
-                {Object.keys(groupedArrivals).length === 0 ? (
+                {sortedDirections.length === 0 ? (
                     <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (
-                    Object.entries(groupedArrivals).map(([direction, trains]) => (
+                    sortedDirections.map(([direction, trains]) => (
                         <div key={direction}>
                             <h3 className={`text-xs font-medium ${theme.textSecondary} uppercase tracking-wider mb-2 border-b ${theme.border} pb-1`}>
                                 {direction}
