@@ -12,6 +12,7 @@ const TrainModule = () => {
     // Local state to manage the list with exit animations
     const [displayedArrivals, setDisplayedArrivals] = useState([]);
     const [exitingTrainIds, setExitingTrainIds] = useState(new Set());
+    const [expandedDirections, setExpandedDirections] = useState(() => new Set());
     const prevArrivalsRef = useRef([]);
     const moduleRef = useRef(null);
     const scrollContainerRef = useRef(null);
@@ -168,6 +169,15 @@ const TrainModule = () => {
         });
     }, [groupedArrivals, isLoopFirst]);
 
+    const toggleDirectionExpanded = (direction) => {
+        setExpandedDirections((prev) => {
+            const next = new Set(prev);
+            if (next.has(direction)) next.delete(direction);
+            else next.add(direction);
+            return next;
+        });
+    };
+
     // Helper to format time
     const formatTime = (dateString) => {
         const date = new Date(dateString);
@@ -213,7 +223,7 @@ const TrainModule = () => {
     }
 
     return (
-        <div ref={moduleRef} className={`h-full w-full min-w-0 ${moduleCard} p-4 flex flex-col relative overflow-hidden`}>
+        <div ref={moduleRef} className={`h-full w-full min-w-0 ${moduleCard} p-3 flex flex-col relative overflow-hidden`}>
 
             <div className="flex justify-between items-center mb-2 gap-3">
                 <h2 className={`min-w-0 text-base md:text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
@@ -259,17 +269,36 @@ const TrainModule = () => {
                 </div>
             </div>
 
-            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-4 pr-4 custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-3 pr-2 custom-scrollbar">
                 {sortedDirections.length === 0 ? (
                     <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (
                     sortedDirections.map(([direction, trains]) => (
                         <div key={direction}>
-                            <h3 className={`text-xs font-medium ${theme.textSecondary} uppercase tracking-wider mb-2 border-b ${theme.border} pb-1`}>
-                                {direction}
-                            </h3>
+                            <div className={`flex items-center justify-between gap-2 mb-2 border-b ${theme.border} pb-1`}>
+                                <h3 className={`min-w-0 text-xs font-medium ${theme.textSecondary} uppercase tracking-wider truncate`}>
+                                    {direction}
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleDirectionExpanded(direction)}
+                                    className={`flex-shrink-0 p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation`}
+                                    aria-label={`${expandedDirections.has(direction) ? 'Collapse' : 'Expand'} ${direction}`}
+                                    title={expandedDirections.has(direction) ? 'Show fewer trains' : 'Show more trains'}
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        className={`h-4 w-4 ${theme.textSecondary} transition-transform ${expandedDirections.has(direction) ? 'rotate-180' : ''}`}
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </button>
+                            </div>
                             <div className="space-y-2 relative">
-                                {trains.slice(0, 3).map((train) => {
+                                {trains.slice(0, expandedDirections.has(direction) ? 4 : 2).map((train) => {
                                     const mins = getMinutes(train.arrT);
                                     const isDue = mins === 'Due';
                                     const isExiting = exitingTrainIds.has(train.rn);
@@ -277,19 +306,19 @@ const TrainModule = () => {
                                     return (
                                         <div
                                             key={train.rn}
-                                            className={`flex items-center justify-between ${moduleCardInner} p-2 rounded-xl ${theme.moduleHover} ring-1 ring-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
+                                            className={`flex items-center justify-between ${moduleCardInner} px-2 py-1.5 rounded-xl ${theme.moduleHover} ring-1 ring-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
                                         >
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2 min-w-0">
                                                 {/* Line Color Badge (No Text) */}
-                                                <div className={`w-2 h-6 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
+                                                <div className={`w-2 h-5 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
 
-                                                <div>
-                                                    <div className={`font-bold ${theme.textPrimary} text-base leading-tight`}>{train.destNm}</div>
+                                                <div className="min-w-0">
+                                                    <div className={`font-bold ${theme.textPrimary} text-sm leading-tight truncate`}>{train.destNm}</div>
                                                     <div className={`text-[10px] ${theme.textSecondary}`}>Run #{train.rn}</div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className={`text-xl font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
+                                                <div className={`text-lg font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
                                                     {isDue ? 'Due' : mins}
                                                 </div>
                                                 <div className={`text-[10px] ${theme.textSecondary}`}>
