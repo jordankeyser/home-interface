@@ -10,48 +10,10 @@ const turnDisplayOn = () => {
 };
 
 const SleepMode = ({ children }) => {
-    const [isSleeping, setIsSleeping] = useState(false); // Start awake
+    const [isSleeping, setIsSleeping] = useState(true); // Start in sleep mode
     const [isQuitting, setIsQuitting] = useState(false);
     const timeoutRef = useRef(null);
-    const scheduleCheckRef = useRef(null);
-    const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes in milliseconds
-
-    // Check if current time is within scheduled hours (Central Time - ensure Pi is set to America/Chicago)
-    const isScheduledWakeTime = useCallback(() => {
-        const now = new Date();
-        const day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-        const hours = now.getHours();
-        const minutes = now.getMinutes();
-        const currentTimeMinutes = hours * 60 + minutes;
-
-        // Sunday (0): not automatically on unless clicked
-        if (day === 0) {
-            return false;
-        }
-
-        // Monday - Thursday (1-4): 6:45 AM - 7:45 AM
-        if (day >= 1 && day <= 4) {
-            const scheduleStart = 6 * 60 + 45; // 6:45 AM in minutes
-            const scheduleEnd = 7 * 60 + 45; // 7:45 AM in minutes
-            return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
-        }
-
-        // Friday (5): 8:00 AM - 10:00 AM
-        if (day === 5) {
-            const scheduleStart = 8 * 60; // 8:00 AM in minutes
-            const scheduleEnd = 10 * 60; // 10:00 AM in minutes
-            return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
-        }
-
-        // Saturday (6): 8:00 AM - 10:00 AM
-        if (day === 6) {
-            const scheduleStart = 8 * 60; // 8:00 AM in minutes
-            const scheduleEnd = 10 * 60; // 10:00 AM in minutes
-            return currentTimeMinutes >= scheduleStart && currentTimeMinutes < scheduleEnd;
-        }
-
-        return false;
-    }, []);
+    const IDLE_TIMEOUT = 3 * 60 * 1000; // 3 minutes in milliseconds
 
     const resetIdleTimer = useCallback(() => {
         if (isQuitting) return;
@@ -60,27 +22,12 @@ const SleepMode = ({ children }) => {
             clearTimeout(timeoutRef.current);
         }
 
-        // Set timeout to go to sleep after 2 minutes of inactivity (regardless of schedule)
+        // Set timeout to go to sleep after 3 minutes of inactivity
         timeoutRef.current = setTimeout(() => {
             setIsSleeping(true);
             turnDisplayOff();
         }, IDLE_TIMEOUT);
     }, [isQuitting, IDLE_TIMEOUT]);
-
-    // Check schedule and automatically wake/sleep
-    const checkSchedule = useCallback(() => {
-        const shouldBeAwake = isScheduledWakeTime();
-
-        if (shouldBeAwake && isSleeping) {
-            // Within scheduled time, wake up and turn on display
-            turnDisplayOn();
-            setIsSleeping(false);
-            window.dispatchEvent(new CustomEvent('wakeFromSleep'));
-        } else if (!shouldBeAwake && !isSleeping) {
-            // Outside scheduled time, start idle timer if not already running
-            resetIdleTimer();
-        }
-    }, [isScheduledWakeTime, isSleeping, resetIdleTimer]);
 
     const wakeUp = useCallback(() => {
         turnDisplayOn();
@@ -124,24 +71,13 @@ const SleepMode = ({ children }) => {
             document.addEventListener(event, resetIdleTimer, true);
         });
 
-        // Check schedule immediately on mount
-        checkSchedule();
-
-        // Set up interval to check schedule every minute
-        scheduleCheckRef.current = setInterval(() => {
-            checkSchedule();
-        }, 60 * 1000); // Check every minute
-
-        // Start the initial timer
-        resetIdleTimer();
+        // Turn off display on initial load (start in sleep mode)
+        turnDisplayOff();
 
         // Cleanup
         return () => {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
-            }
-            if (scheduleCheckRef.current) {
-                clearInterval(scheduleCheckRef.current);
             }
             window.removeEventListener('enterSleepMode', handleSleepMode);
             window.removeEventListener('quitDashboard', handleQuit);
@@ -149,7 +85,7 @@ const SleepMode = ({ children }) => {
                 document.removeEventListener(event, resetIdleTimer, true);
             });
         };
-    }, [resetIdleTimer, handleSleepMode, handleQuit, checkSchedule]);
+    }, [resetIdleTimer, handleSleepMode, handleQuit]);
 
     if (isQuitting) {
         return (
