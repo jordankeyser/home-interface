@@ -213,7 +213,7 @@ const TrainModule = () => {
     }
 
     return (
-        <div ref={moduleRef} className={`h-full w-full ${moduleCard} p-4 flex flex-col relative overflow-hidden`}>
+        <div ref={moduleRef} className={`h-full w-full min-w-0 ${moduleCard} p-4 flex flex-col relative overflow-hidden`}>
 
             <div className="flex justify-between items-center mb-2 gap-3">
                 <h2 className={`min-w-0 text-base md:text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
