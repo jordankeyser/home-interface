@@ -71,6 +71,11 @@ const SleepMode = ({ children }) => {
             document.addEventListener(event, resetIdleTimer, true);
         });
 
+        // Ensure the physical display is on when we start awake
+        if (!isSleeping) {
+            turnDisplayOn();
+        }
+
         // Start idle timer immediately on load
         resetIdleTimer();
 
@@ -85,7 +90,7 @@ const SleepMode = ({ children }) => {
                 document.removeEventListener(event, resetIdleTimer, true);
             });
         };
-    }, [resetIdleTimer, handleSleepMode, handleQuit]);
+    }, [resetIdleTimer, handleSleepMode, handleQuit, isSleeping]);
 
     if (isQuitting) {
         return (
