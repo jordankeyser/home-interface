@@ -12,8 +12,6 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
     const blobB = theme.blobB || 'bg-blue-600';
     const blobC = theme.blobC || 'bg-pink-600';
     const blobOpacity = theme.blobOpacity || 'opacity-20';
-    const bgOverlay = theme.bgOverlay || '';
-    const bgPattern = theme.bgPattern || '';
 
     // Use passed props if available, otherwise use local state
     const settingsOpen = isSettingsOpen !== undefined ? isSettingsOpen : localSettingsOpen;
@@ -32,10 +30,6 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
             >
                 {/* Background Elements (Inside Container) */}
                 <div className={`absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br ${theme.bgPrimary}`}>
-                    {/* Optional theme overlays (Ultra uses these to make the background brighter/more distinct) */}
-                    {bgOverlay && <div className={`absolute inset-0 ${bgOverlay}`}></div>}
-                    {bgPattern && <div className={`absolute inset-0 ${bgPattern}`}></div>}
-
                     <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 ${blobA} rounded-full mix-blend-multiply filter blur-3xl ${blobOpacity} animate-blob`}></div>
                     <div className={`absolute top-[-10%] right-[-10%] w-96 h-96 ${blobB} rounded-full mix-blend-multiply filter blur-3xl ${blobOpacity} animate-blob animation-delay-2000`}></div>
                     <div className={`absolute bottom-[-20%] left-[20%] w-96 h-96 ${blobC} rounded-full mix-blend-multiply filter blur-3xl ${blobOpacity} animate-blob animation-delay-4000`}></div>
