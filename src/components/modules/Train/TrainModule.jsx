@@ -215,15 +215,15 @@ const TrainModule = () => {
     return (
         <div ref={moduleRef} className={`h-full w-full ${moduleCard} p-4 flex flex-col relative overflow-hidden`}>
 
-            <div className="flex justify-between items-center mb-2">
-                <h2 className={`text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
+            <div className="flex justify-between items-center mb-2 gap-3">
+                <h2 className={`min-w-0 text-base md:text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
                     <span className={`w-1.5 h-6 ${theme.accentColor} rounded-full`}></span>
-                    {stationName ? `${stationName} Arrivals` : 'Train Arrivals'}
+                    <span className="truncate">{stationName || 'Trains'}</span>
                 </h2>
-                <div className="flex items-center -space-x-1">
+                <div className="flex items-center gap-1 flex-shrink-0">
                     {lastUpdated && (
-                        <span className={`text-[10px] ${theme.textSecondary} hidden sm:block mr-1`}>
-                            Updated: {lastUpdated.toLocaleTimeString()}
+                        <span className={`text-[10px] ${theme.textSecondary} whitespace-nowrap hidden md:block mr-1`}>
+                            Updated {lastUpdated.toLocaleTimeString()}
                         </span>
                     )}
 
