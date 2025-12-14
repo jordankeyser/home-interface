@@ -8,13 +8,14 @@ const SettingsModal = ({ isOpen, onClose }) => {
     const [showKeys, setShowKeys] = useState({
         ctaApiKey: false,
         ctaStationId: false,
-        zipCode: false
+        zipCode: false,
+        stockApiKey: false
     });
 
     useEffect(() => {
         if (isOpen) {
             setFormData(settings);
-            setShowKeys({ ctaApiKey: false, ctaStationId: false, zipCode: false });
+            setShowKeys({ ctaApiKey: false, ctaStationId: false, zipCode: false, stockApiKey: false });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen]);
@@ -151,6 +152,39 @@ const SettingsModal = ({ isOpen, onClose }) => {
                                         maxLength={5}
                                     />
                                     <EyeIcon show={showKeys.zipCode} onClick={() => toggleShowKey('zipCode')} />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-0.5">Stock API Key (Alpha Vantage)</label>
+                                <div className="flex items-center gap-1">
+                                    <input
+                                        type={showKeys.stockApiKey ? 'text' : 'password'}
+                                        name="stockApiKey"
+                                        value={formData.stockApiKey || ''}
+                                        onChange={handleChange}
+                                        className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="Optional (required to fetch quotes)"
+                                    />
+                                    <EyeIcon show={showKeys.stockApiKey} onClick={() => toggleShowKey('stockApiKey')} />
+                                </div>
+                                <div className="text-[10px] text-gray-500 mt-0.5">
+                                    Uses Alpha Vantage GLOBAL_QUOTE. Free tier is rate-limited, so quotes refresh gradually.
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-0.5">Stock Symbols</label>
+                                <input
+                                    type="text"
+                                    name="stockSymbols"
+                                    value={formData.stockSymbols || ''}
+                                    onChange={handleChange}
+                                    className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder="e.g., AAPL, MSFT, TSLA"
+                                />
+                                <div className="text-[10px] text-gray-500 mt-0.5">
+                                    Comma-separated tickers. The module will auto-scroll continuously.
                                 </div>
                             </div>
                         </div>

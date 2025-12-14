@@ -12,6 +12,8 @@ export const SettingsProvider = ({ children }) => {
             ctaApiKey: '',
             ctaStationId: '40380', // Default to a station (e.g., Clark/Lake or similar)
             zipCode: '60601', // Default to Chicago Loop
+            stockApiKey: '',
+            stockSymbols: 'AAPL, MSFT, TSLA',
             isPiMode: false,
             theme: 'dark', // Default theme
         };

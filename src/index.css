@@ -114,6 +114,19 @@
   }
 }
 
+@keyframes stock-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--ticker-distance, -1000px));
+  }
+}
+
+.stock-ticker-track {
+  animation: stock-ticker var(--ticker-duration, 40s) linear infinite;
+}
+
 body {
   @apply bg-gray-900 text-white overflow-hidden;
   font-family: var(--font-sans);
