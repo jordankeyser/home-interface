@@ -7,6 +7,7 @@ const WeatherModule = () => {
     const { settings, currentTheme } = useSettings();
     const isPiMode = settings.isPiMode;
     const theme = currentTheme.colors;
+    const moduleCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-2xl rounded-3xl`;
     const forecastRef = React.useRef(null);
     const forecastContainerRef = React.useRef(null);
 
@@ -176,7 +177,7 @@ const WeatherModule = () => {
 
     if (loading && !weather) {
         return (
-            <div className={`h-full w-full flex items-center justify-center ${theme.moduleBg} rounded-3xl ${theme.border} border p-6 animate-pulse`}>
+            <div className={`h-full w-full flex items-center justify-center ${moduleCard} p-6 animate-pulse`}>
                 <div className={`${theme.textAccent} font-medium`}>Loading Weather...</div>
             </div>
         );
@@ -184,7 +185,7 @@ const WeatherModule = () => {
 
     if (error) {
         return (
-            <div className="h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl border border-red-500/20 p-6">
+            <div className="h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl ring-1 ring-red-500/30 p-6">
                 <div className="text-red-400 font-bold mb-2">Weather Error</div>
                 <div className="text-sm text-red-300 text-center mb-4">{error}</div>
                 <button onClick={refresh} className="px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 rounded-lg transition-colors">Retry</button>
@@ -199,7 +200,7 @@ const WeatherModule = () => {
     const bgAnimation = renderBackground(current.weather_code);
 
     return (
-        <div className={`h-full w-full bg-gradient-to-br ${theme.bgPrimary} rounded-3xl ${theme.border} border flex flex-col shadow-2xl relative overflow-hidden`}>
+        <div className={`h-full w-full ${moduleCard} flex flex-col relative overflow-hidden`}>
             {bgAnimation}
 
             <div className={`flex-grow flex flex-col items-center z-10 relative ${isPiMode ? 'justify-start pt-2' : 'justify-start pt-8'}`}>

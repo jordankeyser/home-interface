@@ -5,6 +5,7 @@ const ClockBar = ({ onSettingsClick }) => {
     const [time, setTime] = useState(new Date());
     const { currentTheme } = useSettings();
     const theme = currentTheme.colors;
+    const barCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-lg rounded-xl`;
 
     useEffect(() => {
         const timer = setInterval(() => setTime(new Date()), 1000);
@@ -33,7 +34,7 @@ const ClockBar = ({ onSettingsClick }) => {
     };
 
     return (
-        <div className={`w-full ${theme.moduleBg} border-b ${theme.border} p-6 flex justify-between items-center shadow-lg mb-3 rounded-xl`}>
+        <div className={`w-full ${barCard} p-6 flex justify-between items-center mb-3 relative`}>
             <div className="flex flex-col gap-1">
                 <div className={`text-3xl font-bold ${theme.textPrimary} tracking-tight leading-none`}>
                     {formatTime(time)}

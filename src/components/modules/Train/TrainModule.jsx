@@ -6,6 +6,8 @@ const TrainModule = () => {
     const { arrivals, loading, error, lastUpdated, refresh, stationName, isPaused, togglePause } = useCTA();
     const { currentTheme } = useSettings();
     const theme = currentTheme.colors;
+    const moduleCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-xl rounded-3xl`;
+    const moduleCardInner = theme.moduleCardInner || theme.bgSecondary;
 
     // Local state to manage the list with exit animations
     const [displayedArrivals, setDisplayedArrivals] = useState([]);
@@ -189,7 +191,7 @@ const TrainModule = () => {
 
     if (loading && arrivals.length === 0) {
         return (
-            <div className={`h-full w-full flex items-center justify-center ${theme.moduleBg} rounded-3xl ${theme.border} border p-6 animate-pulse`}>
+            <div className={`h-full w-full flex items-center justify-center ${moduleCard} p-6 animate-pulse`}>
                 <div className={`${theme.textAccent} font-medium`}>Loading Train Data...</div>
             </div>
         );
@@ -197,7 +199,7 @@ const TrainModule = () => {
 
     if (error) {
         return (
-            <div className={`h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl border border-red-500/20 p-6`}>
+            <div className={`h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl ring-1 ring-red-500/30 p-6`}>
                 <div className="text-red-400 font-bold mb-2">Connection Error</div>
                 <div className="text-sm text-red-300 text-center mb-4">{error}</div>
                 <button
@@ -211,7 +213,7 @@ const TrainModule = () => {
     }
 
     return (
-        <div ref={moduleRef} className={`h-full w-full ${theme.moduleBg} rounded-3xl ${theme.border} border p-4 flex flex-col shadow-xl relative overflow-hidden`}>
+        <div ref={moduleRef} className={`h-full w-full ${moduleCard} p-4 flex flex-col relative overflow-hidden`}>
 
             <div className="flex justify-between items-center mb-2">
                 <h2 className={`text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
@@ -275,7 +277,7 @@ const TrainModule = () => {
                                     return (
                                         <div
                                             key={train.rn}
-                                            className={`flex items-center justify-between ${theme.bgSecondary} p-2 rounded-lg ${theme.moduleHover} transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
+                                            className={`flex items-center justify-between ${moduleCardInner} p-2 rounded-xl ${theme.moduleHover} ring-1 ring-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
                                         >
                                             <div className="flex items-center gap-3">
                                                 {/* Line Color Badge (No Text) */}

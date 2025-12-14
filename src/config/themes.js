@@ -168,32 +168,48 @@ export const themes = {
     id: 'ultra',
     name: 'Ultra Modern',
     colors: {
-      // Background - deep space dark with subtle blue tint
-      bgPrimary: 'from-slate-950 via-blue-950 to-black',
-      bgSecondary: 'bg-cyan-500/15',
-      bgTertiary: 'bg-slate-950',
+      // Background - deep dark mode with a modern, multi-accent undertone
+      // (Use arbitrary hex to avoid washed-out Tailwind grays on large displays.)
+      bgPrimary: 'from-[#05060A] via-[#080F1F] to-[#020409]',
+      bgSecondary: 'bg-white/6',
+      bgTertiary: 'bg-black/40',
 
-      // Text - crisp whites and electric blues
+      // Text - crisp and restrained (accent is used sparingly)
       textPrimary: 'text-slate-50',
       textSecondary: 'text-slate-400',
-      textAccent: 'text-cyan-400',
+      textAccent: 'text-cyan-300',
 
-      // Borders - glowing neon effect
-      border: 'border-cyan-400/60 shadow-[0_0_15px_rgba(34,211,238,0.3)]',
-      borderAccent: 'border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.5)]',
+      // Borders (legacy tokens; most cards now use rings to avoid clipping)
+      border: 'border-white/10',
+      borderAccent: 'border-cyan-300/60',
 
-      // Module backgrounds - elevated glass with glow
-      moduleBg: 'bg-slate-900/40 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(34,211,238,0.15)]',
-      moduleHover: 'hover:bg-slate-900/60 hover:shadow-[0_8px_32px_0_rgba(34,211,238,0.25)]',
+      // Module surfaces
+      // NOTE: prefer `moduleCard` in components; keep `moduleBg` for compatibility.
+      moduleBg: 'bg-white/[0.04] backdrop-blur-xl',
+      moduleHover: 'hover:bg-white/[0.06]',
 
-      // Buttons - sleek with glow effects
-      buttonBg: 'bg-cyan-500/10',
-      buttonHover: 'hover:bg-cyan-500/20',
-      buttonActive: 'active:bg-cyan-500/30',
+      // New: consistent card styling (depth without relying on outer shadows)
+      moduleCard:
+        'rounded-3xl bg-gradient-to-b from-white/[0.07] via-white/[0.04] to-white/[0.02] backdrop-blur-xl ring-1 ring-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.55)] ' +
+        'transition-[transform,background,box-shadow] duration-300 ease-out hover:-translate-y-[1px] hover:ring-white/20 hover:shadow-[0_18px_60px_rgba(0,0,0,0.6)]',
+      moduleCardInner:
+        'bg-black/20 ring-1 ring-white/10',
+      moduleDivider:
+        'bg-gradient-to-r from-transparent via-white/15 to-transparent',
 
-      // Accent colors - electric cyan
+      // Buttons - sleek, dark-first, with subtle color glow
+      buttonBg: 'bg-white/5',
+      buttonHover: 'hover:bg-white/8',
+      buttonActive: 'active:bg-white/12',
+
+      // Accent colors - modern cyan + violet hints (used in blobs + highlights)
       accent: 'cyan',
-      accentColor: 'bg-cyan-400'
+      accentColor: 'bg-cyan-300',
+
+      // New: background blobs for Layout
+      blobA: 'bg-fuchsia-500/50',
+      blobB: 'bg-cyan-500/50',
+      blobC: 'bg-violet-500/50'
     }
   }
 };

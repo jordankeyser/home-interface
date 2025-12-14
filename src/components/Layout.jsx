@@ -8,6 +8,9 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
 
     const isPiMode = settings.isPiMode;
     const theme = currentTheme.colors;
+    const blobA = theme.blobA || 'bg-purple-600';
+    const blobB = theme.blobB || 'bg-blue-600';
+    const blobC = theme.blobC || 'bg-pink-600';
 
     // Use passed props if available, otherwise use local state
     const settingsOpen = isSettingsOpen !== undefined ? isSettingsOpen : localSettingsOpen;
@@ -26,14 +29,14 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
             >
                 {/* Background Elements (Inside Container) */}
                 <div className={`absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br ${theme.bgPrimary}`}>
-                    <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
-                    <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
-                    <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+                    <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 ${blobA} rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob`}></div>
+                    <div className={`absolute top-[-10%] right-[-10%] w-96 h-96 ${blobB} rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000`}></div>
+                    <div className={`absolute bottom-[-20%] left-[20%] w-96 h-96 ${blobC} rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000`}></div>
                 </div>
 
                 {/* Main Content Container */}
                 <main className="relative z-10 h-full flex flex-col p-4">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-[45%_55%] gap-3 overflow-hidden">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-[45%_55%] gap-3 overflow-visible">
                         {children}
                     </div>
                 </main>
