@@ -170,19 +170,19 @@ export const themes = {
     colors: {
       // Background - deep dark mode with a modern, multi-accent undertone
       // (Use arbitrary hex to avoid washed-out Tailwind grays on large displays.)
-      // Brighter canvas (use plain Tailwind gradient stops for maximum reliability in kiosk Chromium).
-      bgPrimary: 'from-slate-900 via-blue-800 to-slate-950',
+      // Brighter canvas (still safe Tailwind classes) with a pop of the brand blue (#00abff).
+      bgPrimary: 'from-slate-900 via-sky-800 to-slate-950',
       bgSecondary: 'bg-white/6',
       bgTertiary: 'bg-black/40',
 
       // Text - crisp and restrained (accent is used sparingly)
       textPrimary: 'text-slate-50',
       textSecondary: 'text-slate-400',
-      textAccent: 'text-cyan-300',
+      textAccent: 'text-[#00abff]',
 
       // Borders (legacy tokens; most cards now use rings to avoid clipping)
       border: 'border-white/10',
-      borderAccent: 'border-cyan-300/60',
+      borderAccent: 'border-[#00abff]/60',
 
       // Module surfaces
       // NOTE: prefer `moduleCard` in components; keep `moduleBg` for compatibility.
@@ -210,12 +210,12 @@ export const themes = {
       buttonActive: 'active:bg-white/12',
 
       // Accent colors - modern cyan + violet hints (used in blobs + highlights)
-      accent: 'cyan',
-      accentColor: 'bg-cyan-300',
+      accent: 'blue',
+      accentColor: 'bg-[#00abff]',
 
       // New: background blobs for Layout
       blobA: 'bg-fuchsia-500/50',
-      blobB: 'bg-cyan-500/50',
+      blobB: 'bg-[#00abff]/55',
       blobC: 'bg-violet-500/50',
       blobOpacity: 'opacity-30'
     }

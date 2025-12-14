@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import ClockBar from './components/ClockBar';
 import TrainModule from './components/modules/Train/TrainModule';
 import WeatherModule from './components/modules/Weather/WeatherModule';
+import BlankModule from './components/modules/Blank/BlankModule';
 import SleepMode from './components/SleepMode';
 
 function App() {
@@ -22,8 +23,14 @@ function App() {
           </div>
 
           {/* Right Column: Train Full Height */}
-          <div className="h-full min-h-0 min-w-0 overflow-visible">
-            <TrainModule />
+          <div className="h-full min-h-0 min-w-0 overflow-visible flex flex-col gap-3">
+            <div className="flex-1 min-h-0 min-w-0">
+              <TrainModule />
+            </div>
+            {/* Placeholder module for future content (slightly larger than the time module) */}
+            <div className="h-40 md:h-44 min-w-0">
+              <BlankModule />
+            </div>
           </div>
         </Layout>
       </SleepMode>
