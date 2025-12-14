@@ -10,7 +10,7 @@ const turnDisplayOn = () => {
 };
 
 const SleepMode = ({ children }) => {
-    const [isSleeping, setIsSleeping] = useState(true); // Start in sleep mode
+    const [isSleeping, setIsSleeping] = useState(false); // Start awake; sleep after inactivity or via Settings
     const [isQuitting, setIsQuitting] = useState(false);
     const timeoutRef = useRef(null);
     const IDLE_TIMEOUT = 3 * 60 * 1000; // 3 minutes in milliseconds
@@ -71,8 +71,8 @@ const SleepMode = ({ children }) => {
             document.addEventListener(event, resetIdleTimer, true);
         });
 
-        // Turn off display on initial load (start in sleep mode)
-        turnDisplayOff();
+        // Start idle timer immediately on load
+        resetIdleTimer();
 
         // Cleanup
         return () => {
