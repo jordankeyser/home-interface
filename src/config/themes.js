@@ -170,7 +170,8 @@ export const themes = {
     colors: {
       // Background - deep dark mode with a modern, multi-accent undertone
       // (Use arbitrary hex to avoid washed-out Tailwind grays on large displays.)
-      bgPrimary: 'from-[#05060A] via-[#080F1F] to-[#020409]',
+      // Brighter than other dark themes so the *background* reads as a designed surface.
+      bgPrimary: 'from-[#0B1020] via-[#152A5A] to-[#05060A]',
       bgSecondary: 'bg-white/6',
       bgTertiary: 'bg-black/40',
 
@@ -216,6 +217,14 @@ export const themes = {
       blobA: 'bg-fuchsia-500/50',
       blobB: 'bg-cyan-500/50',
       blobC: 'bg-violet-500/50'
+      ,
+      blobOpacity: 'opacity-30',
+
+      // New: make the app background lighter + more “designed”
+      bgOverlay:
+        'bg-[radial-gradient(1100px_700px_at_18%_8%,rgba(255,255,255,0.10),transparent_60%),radial-gradient(900px_600px_at_92%_18%,rgba(34,211,238,0.14),transparent_60%),radial-gradient(1000px_700px_at_50%_110%,rgba(217,70,239,0.12),transparent_65%)]',
+      bgPattern:
+        'opacity-60 bg-[linear-gradient(to_right,rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:48px_48px]'
     }
   }
 };
