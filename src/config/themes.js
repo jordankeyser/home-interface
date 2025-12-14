@@ -170,8 +170,8 @@ export const themes = {
     colors: {
       // Background - deep dark mode with a modern, multi-accent undertone
       // (Use arbitrary hex to avoid washed-out Tailwind grays on large displays.)
-      // Brighter than other dark themes so the *background* reads as a designed surface.
-      bgPrimary: 'from-[#0B1020] via-[#152A5A] to-[#05060A]',
+      // Brighter canvas so the *background* reads as its own surface (not just “black behind cards”).
+      bgPrimary: 'from-[#101A3A] via-[#2A5FB6] to-[#070A14]',
       bgSecondary: 'bg-white/6',
       bgTertiary: 'bg-black/40',
 
@@ -214,10 +214,14 @@ export const themes = {
       accentColor: 'bg-cyan-300',
 
       // New: background blobs for Layout
-      blobA: 'bg-fuchsia-500/50',
-      blobB: 'bg-cyan-500/50',
-      blobC: 'bg-violet-500/50',
-      blobOpacity: 'opacity-35'
+      blobA: 'bg-fuchsia-400/60',
+      blobB: 'bg-cyan-400/60',
+      blobC: 'bg-violet-400/60',
+      blobOpacity: 'opacity-45',
+      blobBlend: 'mix-blend-screen',
+
+      // Subtle vignette to keep edges readable while the mid-canvas stays brighter
+      bgVignette: 'bg-gradient-to-b from-white/10 via-transparent to-black/35'
     }
   }
 };

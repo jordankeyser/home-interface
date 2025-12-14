@@ -12,6 +12,8 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
     const blobB = theme.blobB || 'bg-blue-600';
     const blobC = theme.blobC || 'bg-pink-600';
     const blobOpacity = theme.blobOpacity || 'opacity-20';
+    const blobBlend = theme.blobBlend || 'mix-blend-multiply';
+    const bgVignette = theme.bgVignette || '';
 
     // Use passed props if available, otherwise use local state
     const settingsOpen = isSettingsOpen !== undefined ? isSettingsOpen : localSettingsOpen;
@@ -30,9 +32,10 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
             >
                 {/* Background Elements (Inside Container) */}
                 <div className={`absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br ${theme.bgPrimary}`}>
-                    <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 ${blobA} rounded-full mix-blend-multiply filter blur-3xl ${blobOpacity} animate-blob`}></div>
-                    <div className={`absolute top-[-10%] right-[-10%] w-96 h-96 ${blobB} rounded-full mix-blend-multiply filter blur-3xl ${blobOpacity} animate-blob animation-delay-2000`}></div>
-                    <div className={`absolute bottom-[-20%] left-[20%] w-96 h-96 ${blobC} rounded-full mix-blend-multiply filter blur-3xl ${blobOpacity} animate-blob animation-delay-4000`}></div>
+                    {bgVignette && <div className={`absolute inset-0 ${bgVignette}`}></div>}
+                    <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 ${blobA} rounded-full ${blobBlend} filter blur-3xl ${blobOpacity} animate-blob`}></div>
+                    <div className={`absolute top-[-10%] right-[-10%] w-96 h-96 ${blobB} rounded-full ${blobBlend} filter blur-3xl ${blobOpacity} animate-blob animation-delay-2000`}></div>
+                    <div className={`absolute bottom-[-20%] left-[20%] w-96 h-96 ${blobC} rounded-full ${blobBlend} filter blur-3xl ${blobOpacity} animate-blob animation-delay-4000`}></div>
                 </div>
 
                 {/* Main Content Container */}
