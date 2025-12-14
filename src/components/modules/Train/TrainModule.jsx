@@ -269,23 +269,23 @@ const TrainModule = () => {
                 </div>
             </div>
 
-            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-3 pr-2 custom-scrollbar">
+            <div ref={scrollContainerRef} className="flex-grow overflow-y-auto overflow-x-hidden space-y-3 pr-3 custom-scrollbar">
                 {sortedDirections.length === 0 ? (
                     <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                 ) : (
                     sortedDirections.map(([direction, trains]) => (
                         <div key={direction}>
-                            <div className={`flex items-center justify-between gap-2 mb-2 border-b ${theme.border} pb-1`}>
+                            <button
+                                type="button"
+                                onClick={() => toggleDirectionExpanded(direction)}
+                                className={`w-full flex items-center justify-between gap-2 mb-2 border-b ${theme.border} pb-1 text-left ${theme.moduleHover} rounded-lg px-2 -mx-2 transition-colors`}
+                                aria-label={`${expandedDirections.has(direction) ? 'Collapse' : 'Expand'} ${direction}`}
+                                title={expandedDirections.has(direction) ? 'Show fewer trains' : 'Show more trains'}
+                            >
                                 <h3 className={`min-w-0 text-xs font-medium ${theme.textSecondary} uppercase tracking-wider truncate`}>
                                     {direction}
                                 </h3>
-                                <button
-                                    type="button"
-                                    onClick={() => toggleDirectionExpanded(direction)}
-                                    className={`flex-shrink-0 p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation`}
-                                    aria-label={`${expandedDirections.has(direction) ? 'Collapse' : 'Expand'} ${direction}`}
-                                    title={expandedDirections.has(direction) ? 'Show fewer trains' : 'Show more trains'}
-                                >
+                                <span className="flex-shrink-0 p-1.5 rounded-full">
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         className={`h-4 w-4 ${theme.textSecondary} transition-transform ${expandedDirections.has(direction) ? 'rotate-180' : ''}`}
@@ -295,8 +295,8 @@ const TrainModule = () => {
                                     >
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
-                                </button>
-                            </div>
+                                </span>
+                            </button>
                             <div className="space-y-2 relative">
                                 {trains.slice(0, expandedDirections.has(direction) ? 4 : 2).map((train) => {
                                     const mins = getMinutes(train.arrT);
@@ -306,24 +306,19 @@ const TrainModule = () => {
                                     return (
                                         <div
                                             key={train.rn}
-                                            className={`flex items-center justify-between ${moduleCardInner} px-2 py-1.5 rounded-xl ${theme.moduleHover} ring-1 ring-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
+                                            className={`flex items-center justify-between ${moduleCardInner} px-2 py-1 rounded-xl ${theme.moduleHover} ring-1 ring-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
                                                 {/* Line Color Badge (No Text) */}
-                                                <div className={`w-2 h-5 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
+                                                <div className={`w-2 h-4 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
 
                                                 <div className="min-w-0">
                                                     <div className={`font-bold ${theme.textPrimary} text-sm leading-tight truncate`}>{train.destNm}</div>
-                                                    <div className={`text-[10px] ${theme.textSecondary}`}>Run #{train.rn}</div>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <div className={`text-lg font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
+                                                <div className={`text-base font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
                                                     {isDue ? 'Due' : mins}
-                                                </div>
-                                                <div className={`text-[10px] ${theme.textSecondary}`}>
-                                                    {!isDue && <span className="mr-1 opacity-70">est</span>}
-                                                    {formatTime(train.arrT)}
                                                 </div>
                                             </div>
                                         </div>
