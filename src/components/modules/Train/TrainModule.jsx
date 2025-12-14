@@ -271,7 +271,7 @@ const TrainModule = () => {
 
             {/* Inset scroll area so the scrollbar is not flush against the module edge */}
             <div className="flex-grow min-h-0 pr-3">
-                <div ref={scrollContainerRef} className="h-full overflow-y-auto overflow-x-hidden space-y-3 custom-scrollbar pr-2">
+                <div ref={scrollContainerRef} className="h-full overflow-y-auto overflow-x-hidden space-y-3 custom-scrollbar pr-2 pb-10">
                     {sortedDirections.length === 0 ? (
                         <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                     ) : (
@@ -332,6 +332,9 @@ const TrainModule = () => {
                     )}
                 </div>
             </div>
+
+            {/* Bottom fade so additional trains feel like they “continue” instead of hard-clipping */}
+            <div className="pointer-events-none absolute left-3 right-3 bottom-3 h-10 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-transparent rounded-b-3xl" />
         </div>
     );
 };

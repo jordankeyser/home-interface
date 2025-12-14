@@ -41,7 +41,8 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
                 {/* Main Content Container */}
                 <main className="relative z-10 h-full min-h-0 flex flex-col w-full py-4">
                     {/* Single centered wrapper ensures perfectly even left/right gutters */}
-                    <div className="flex-1 min-h-0 w-full max-w-[1400px] mx-auto px-6">
+                    {/* Slight right-gutter bias to visually balance the Train scrollbar on the right */}
+                    <div className="flex-1 min-h-0 w-full max-w-[1400px] mx-auto pl-6 pr-10">
                         <div className="h-full min-h-0 grid grid-cols-1 md:grid-cols-[45%_55%] gap-4 overflow-visible w-full">
                             {children}
                         </div>
