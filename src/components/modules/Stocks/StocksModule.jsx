@@ -148,10 +148,10 @@ const StocksModule = () => {
 
   return (
     <div className={`w-full h-full ${moduleCard} p-3 flex flex-col min-w-0 overflow-hidden`}>
-      <div className="flex items-center justify-between mb-2">
-        <div className={`text-sm font-bold ${theme.textPrimary} flex items-center gap-2 min-w-0`}>
+      <div className="flex items-center justify-between mb-1">
+        <div className={`min-w-0 text-base md:text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
           <span className={`w-1.5 h-5 ${theme.accentColor} rounded-full`} />
-          <span className="truncate">Stocks</span>
+          <span className="truncate">Portfolio</span>
         </div>
         <div className={`text-[10px] ${theme.textSecondary} whitespace-nowrap`}>
           {error ? 'Error' : apiKey ? 'Live' : 'Needs API key'}
@@ -169,7 +169,7 @@ const StocksModule = () => {
         </div>
       )}
 
-      <div className="mt-2 relative flex-1 min-h-0 overflow-hidden">
+      <div className="mt-1 relative flex-1 min-h-0 overflow-hidden stock-ticker-mask">
         <div
           ref={trackRef}
           className="stock-ticker-track flex items-center gap-6 whitespace-nowrap will-change-transform"
@@ -178,12 +178,14 @@ const StocksModule = () => {
         >
           {items.map((it, idx) => (
             <div key={`${it.symbol}-${idx}`} className="flex items-center gap-2">
-              <span className={`${theme.textPrimary} text-sm font-semibold`}>{it.symbol}</span>
-              <span className={`${theme.textSecondary} text-sm tabular-nums`}>
+              <span className={`${theme.textPrimary} text-base font-semibold tracking-wide`}>
+                {it.symbol}
+              </span>
+              <span className={`${theme.textSecondary} text-base tabular-nums`}>
                 {typeof it.price === 'number' && it.price > 0 ? it.price.toFixed(2) : '--'}
               </span>
               <span
-                className={`text-sm tabular-nums ${it.isUp ? 'text-emerald-300' : 'text-rose-300'}`}
+                className={`text-base tabular-nums font-medium ${it.isUp ? 'text-emerald-300' : 'text-rose-300'}`}
               >
                 {typeof it.changePct === 'number'
                   ? `${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%`
@@ -192,10 +194,6 @@ const StocksModule = () => {
             </div>
           ))}
         </div>
-
-        {/* subtle edge fades */}
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/40 to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/40 to-transparent" />
       </div>
     </div>
   );
