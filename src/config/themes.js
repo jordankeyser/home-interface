@@ -162,6 +162,39 @@ export const themes = {
       accent: 'blue',
       accentColor: 'bg-blue-700'
     }
+  },
+
+  ultra: {
+    id: 'ultra',
+    name: 'Ultra Modern',
+    colors: {
+      // Background - deep space dark with subtle blue tint
+      bgPrimary: 'from-slate-950 via-blue-950 to-black',
+      bgSecondary: 'bg-cyan-500/15',
+      bgTertiary: 'bg-slate-950',
+
+      // Text - crisp whites and electric blues
+      textPrimary: 'text-slate-50',
+      textSecondary: 'text-slate-400',
+      textAccent: 'text-cyan-400',
+
+      // Borders - glowing neon effect
+      border: 'border-cyan-400/60 shadow-[0_0_15px_rgba(34,211,238,0.3)]',
+      borderAccent: 'border-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.5)]',
+
+      // Module backgrounds - elevated glass with glow
+      moduleBg: 'bg-slate-900/40 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(34,211,238,0.15)]',
+      moduleHover: 'hover:bg-slate-900/60 hover:shadow-[0_8px_32px_0_rgba(34,211,238,0.25)]',
+
+      // Buttons - sleek with glow effects
+      buttonBg: 'bg-cyan-500/10',
+      buttonHover: 'hover:bg-cyan-500/20',
+      buttonActive: 'active:bg-cyan-500/30',
+
+      // Accent colors - electric cyan
+      accent: 'cyan',
+      accentColor: 'bg-cyan-400'
+    }
   }
 };
 
