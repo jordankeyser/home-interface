@@ -14,7 +14,7 @@ function App() {
       <SleepMode>
         <Layout isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen}>
           {/* Left Column: ClockBar + Weather Stacked */}
-          <div className="flex flex-col gap-4 h-full min-h-0 overflow-visible">
+          <div className="flex flex-col gap-3 h-full min-h-0 overflow-visible">
             <ClockBar onSettingsClick={() => setIsSettingsOpen(true)} />
             <div className="flex-1 min-h-0 overflow-visible">
               <WeatherModule />

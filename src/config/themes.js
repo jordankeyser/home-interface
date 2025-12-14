@@ -190,9 +190,16 @@ export const themes = {
 
       // New: consistent card styling (depth without relying on outer shadows)
       moduleCard:
-        'rounded-3xl bg-gradient-to-b from-white/[0.12] via-white/[0.07] to-white/[0.035] backdrop-blur-xl ring-1 ring-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.35),0_16px_60px_rgba(0,0,0,0.75)]',
+        // 3D depth cues:
+        // - stronger ambient shadow (card lifts off background)
+        // - subtle ring-offset layer (separation from backdrop)
+        // - inset highlights/shading (gives “surface”)
+        'relative rounded-3xl bg-gradient-to-b from-white/[0.14] via-white/[0.075] to-white/[0.03] backdrop-blur-2xl ' +
+        'ring-1 ring-white/18 ring-offset-1 ring-offset-black/40 ' +
+        'shadow-[inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-24px_48px_rgba(0,0,0,0.30),0_22px_80px_rgba(0,0,0,0.85)] ' +
+        'transition-[box-shadow,background,ring-color] duration-300 ease-out hover:ring-white/24 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.16),inset_0_-24px_48px_rgba(0,0,0,0.32),0_26px_96px_rgba(0,0,0,0.88)]',
       moduleCardInner:
-        'bg-black/28 ring-1 ring-white/12',
+        'bg-black/32 ring-1 ring-white/12',
       moduleDivider:
         'bg-gradient-to-r from-transparent via-white/15 to-transparent',
 

@@ -35,8 +35,8 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
                 </div>
 
                 {/* Main Content Container */}
-                <main className="relative z-10 h-full min-h-0 flex flex-col px-6 py-6">
-                    <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-visible w-full">
+                <main className="relative z-10 h-full min-h-0 flex flex-col px-4 py-4">
+                    <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2 gap-4 overflow-visible w-full">
                         {children}
                     </div>
                 </main>
