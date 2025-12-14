@@ -190,8 +190,7 @@ export const themes = {
 
       // New: consistent card styling (depth without relying on outer shadows)
       moduleCard:
-        'rounded-3xl bg-gradient-to-b from-white/[0.11] via-white/[0.06] to-white/[0.03] backdrop-blur-xl ring-1 ring-white/14 shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_14px_50px_rgba(0,0,0,0.68)] ' +
-        'transition-[transform,background,box-shadow] duration-300 ease-out hover:-translate-y-[1px] hover:ring-white/22 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_18px_70px_rgba(0,0,0,0.72)]',
+        'rounded-3xl bg-gradient-to-b from-white/[0.12] via-white/[0.07] to-white/[0.035] backdrop-blur-xl ring-1 ring-white/16 shadow-[inset_0_1px_0_rgba(255,255,255,0.12),inset_0_-1px_0_rgba(0,0,0,0.35),0_16px_60px_rgba(0,0,0,0.75)]',
       moduleCardInner:
         'bg-black/28 ring-1 ring-white/12',
       moduleDivider:

@@ -243,7 +243,7 @@ const WeatherModule = () => {
                     ))}
                 </div>
 
-                <div className={`w-full h-px bg-gradient-to-r from-transparent via-${theme.textPrimary}/20 to-transparent my-1`}></div>
+                <div className={`w-full h-px ${theme.moduleDivider || 'bg-gradient-to-r from-transparent via-white/15 to-transparent'} my-1`}></div>
 
                 <div className="flex justify-around text-center px-2 pb-1">
                     <div>
