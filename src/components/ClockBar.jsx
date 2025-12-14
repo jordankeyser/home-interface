@@ -34,7 +34,7 @@ const ClockBar = ({ onSettingsClick }) => {
     };
 
     return (
-        <div className={`w-full ${barCard} p-6 flex justify-between items-center mb-3 relative`}>
+        <div className={`w-full ${barCard} p-6 flex justify-between items-center relative`}>
             <div className="flex flex-col gap-1">
                 <div className={`text-3xl font-bold ${theme.textPrimary} tracking-tight leading-none`}>
                     {formatTime(time)}

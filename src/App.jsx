@@ -14,15 +14,15 @@ function App() {
       <SleepMode>
         <Layout isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen}>
           {/* Left Column: ClockBar + Weather Stacked */}
-          <div className="flex flex-col gap-1 h-full overflow-visible">
+          <div className="flex flex-col gap-4 h-full min-h-0 overflow-visible">
             <ClockBar onSettingsClick={() => setIsSettingsOpen(true)} />
-            <div className="flex-1 overflow-visible">
+            <div className="flex-1 min-h-0 overflow-visible">
               <WeatherModule />
             </div>
           </div>
 
           {/* Right Column: Train Full Height */}
-          <div className="h-full overflow-visible">
+          <div className="h-full min-h-0 overflow-visible">
             <TrainModule />
           </div>
         </Layout>

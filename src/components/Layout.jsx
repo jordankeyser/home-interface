@@ -21,9 +21,9 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
 
             {/* Emulator Container */}
             <div
-                className={`relative overflow-hidden transition-all duration-500 ease-in-out ${isPiMode
-                    ? 'w-[1024px] h-[600px] border-8 border-gray-800 rounded-xl shadow-2xl bg-gray-900'
-                    : 'w-full h-screen'
+                className={`relative transition-all duration-500 ease-in-out ${isPiMode
+                    ? 'overflow-hidden w-[1024px] h-[600px] border-8 border-gray-800 rounded-xl shadow-2xl bg-gray-900'
+                    : 'overflow-visible w-full h-screen'
                     }`}
                 style={isPiMode ? { transform: 'scale(0.85)', transformOrigin: 'center' } : {}}
             >
@@ -35,8 +35,8 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
                 </div>
 
                 {/* Main Content Container */}
-                <main className="relative z-10 h-full flex flex-col p-4">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-[45%_55%] gap-3 overflow-visible">
+                <main className="relative z-10 h-full min-h-0 flex flex-col px-6 py-6">
+                    <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[45%_55%] gap-4 overflow-visible w-full max-w-[1400px] mx-auto">
                         {children}
                     </div>
                 </main>
