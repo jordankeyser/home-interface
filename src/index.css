@@ -133,6 +133,12 @@
   mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
 }
 
+.train-scroll-mask {
+  /* Fade the train list at the bottom so it feels like it continues off-screen, without a visible overlay band. */
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 100%);
+}
+
 body {
   @apply bg-gray-900 text-white overflow-hidden;
   font-family: var(--font-sans);
