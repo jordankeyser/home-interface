@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from '../../../context/SettingsContext';
 
 const REFRESH_ALL_MS = 60_000;
+const PER_REQUEST_DELAY_MS = 1100; // Alpha Vantage guidance: ~1 request/second
 const PX_PER_SECOND = 28; // slow, constant movement
 const MIN_DURATION_S = 18;
 
@@ -55,45 +56,71 @@ const StocksModule = () => {
 
   const [quotes, setQuotes] = useState(() => new Map());
   const [error, setError] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const runIdRef = useRef(0);
+  const timeoutRef = useRef(null);
 
   const trackRef = useRef(null);
   const [tickerStyle, setTickerStyle] = useState({});
 
-  // Fetch all quotes at once (once per minute).
-  useEffect(() => {
-    let cancelled = false;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    async function refreshAll() {
-      if (!apiKey || symbols.length === 0) {
-        if (!cancelled) {
-          setError('');
-          setQuotes(new Map());
-        }
-        return;
-      }
-
-      try {
-        if (cancelled) return;
-        const results = await Promise.all(symbols.map((sym) => fetchAlphaVantageQuote(sym, apiKey)));
-        if (cancelled) return;
-        const next = new Map();
-        results.forEach((q) => next.set(q.symbol, q));
-        setQuotes(next);
-        setError('');
-      } catch (e) {
-        if (cancelled) return;
-        setError(e?.message || 'Failed to load stocks');
-      }
+  const refreshAll = async (runId) => {
+    if (!apiKey || symbols.length === 0) {
+      setError('');
+      setQuotes(new Map());
+      return;
     }
 
-    // Kick off an immediate fetch for the first symbol.
-    refreshAll();
-    const id = setInterval(refreshAll, REFRESH_ALL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
+    setIsRefreshing(true);
+    try {
+      const next = new Map(quotes);
+      for (let i = 0; i < symbols.length; i++) {
+        if (runIdRef.current !== runId) return; // cancelled/restarted
+        const sym = symbols[i];
+        // Spread requests to ~1/sec (no bursts)
+        if (i > 0) await sleep(PER_REQUEST_DELAY_MS);
+        const q = await fetchAlphaVantageQuote(sym, apiKey);
+        next.set(q.symbol, q);
+      }
+      if (runIdRef.current !== runId) return;
+      setQuotes(next);
+      setError('');
+    } catch (e) {
+      if (runIdRef.current !== runId) return;
+      setError(e?.message || 'Failed to load stocks');
+    } finally {
+      if (runIdRef.current === runId) setIsRefreshing(false);
+    }
+  };
+
+  const scheduleLoop = (runId) => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    const tick = async () => {
+      await refreshAll(runId);
+      if (runIdRef.current !== runId) return;
+      timeoutRef.current = setTimeout(tick, REFRESH_ALL_MS);
     };
-  }, [symbols, apiKey]);
+    tick();
+  };
+
+  const handleManualRefresh = () => {
+    runIdRef.current += 1;
+    scheduleLoop(runIdRef.current);
+  };
+
+  // Start/Restart the refresh loop when symbols/apiKey change
+  useEffect(() => {
+    runIdRef.current += 1;
+    const runId = runIdRef.current;
+    scheduleLoop(runId);
+    return () => {
+      runIdRef.current += 1;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [symbols.join(','), apiKey]);
 
   // Compute marquee distance/duration for seamless, constant movement
   useEffect(() => {
@@ -142,8 +169,22 @@ const StocksModule = () => {
           <span className={`w-1.5 h-5 ${theme.accentColor} rounded-full`} />
           <span className="truncate">Portfolio</span>
         </div>
-        <div className={`text-[10px] ${theme.textSecondary} whitespace-nowrap`}>
-          {error ? 'Error' : apiKey ? 'Live' : 'Needs API key'}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <div className={`text-[10px] ${theme.textSecondary} whitespace-nowrap`}>
+            {error ? 'Error' : apiKey ? 'Live' : 'Needs API key'}
+          </div>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={!apiKey || isRefreshing}
+            className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center ${isRefreshing ? 'animate-spin opacity-60' : ''}`}
+            title="Refresh Portfolio"
+            aria-label="Refresh Portfolio"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${theme.textSecondary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
         </div>
       </div>
 
