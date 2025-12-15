@@ -127,6 +127,10 @@
   animation: stock-ticker var(--ticker-duration, 40s) linear infinite;
 }
 
+.stock-ticker-paused {
+  animation-play-state: paused;
+}
+
 .stock-ticker-mask {
   /* Fade the ticker at the edges without drawing any visible overlay/background. */
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);

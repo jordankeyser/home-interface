@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from '../../../context/SettingsContext';
 
 const REFRESH_ALL_MS = 60_000;
-const PER_REQUEST_DELAY_MS = 1100; // Alpha Vantage guidance: ~1 request/second
+// Alpha Vantage free tier is typically ~5 requests/min; keep us safely under that.
+const MAX_REQUESTS_PER_MIN = 5;
+const PER_REQUEST_DELAY_MS = Math.ceil(60_000 / MAX_REQUESTS_PER_MIN);
 const PX_PER_SECOND = 28; // slow, constant movement
 const MIN_DURATION_S = 18;
 
@@ -55,8 +57,9 @@ const StocksModule = () => {
   const apiKey = (settings.stockApiKey || '').trim();
 
   const [quotes, setQuotes] = useState(() => new Map());
-  const [error, setError] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [isTickerPaused, setIsTickerPaused] = useState(false);
 
   const runIdRef = useRef(0);
   const timeoutRef = useRef(null);
@@ -68,8 +71,8 @@ const StocksModule = () => {
 
   const refreshAll = async (runId) => {
     if (!apiKey || symbols.length === 0) {
-      setError('');
       setQuotes(new Map());
+      setIsRateLimited(false);
       return;
     }
 
@@ -79,17 +82,21 @@ const StocksModule = () => {
       for (let i = 0; i < symbols.length; i++) {
         if (runIdRef.current !== runId) return; // cancelled/restarted
         const sym = symbols[i];
-        // Spread requests to ~1/sec (no bursts)
+        // Spread requests to respect Alpha Vantage limits (no bursts)
         if (i > 0) await sleep(PER_REQUEST_DELAY_MS);
         const q = await fetchAlphaVantageQuote(sym, apiKey);
         next.set(q.symbol, q);
       }
       if (runIdRef.current !== runId) return;
       setQuotes(next);
-      setError('');
+      setIsRateLimited(false);
     } catch (e) {
       if (runIdRef.current !== runId) return;
-      setError(e?.message || 'Failed to load stocks');
+      // Do not surface errors to the UI; silently degrade to symbols-only.
+      const msg = String(e?.message || '');
+      if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('alpha vantage')) {
+        setIsRateLimited(true);
+      }
     } finally {
       if (runIdRef.current === runId) setIsRefreshing(false);
     }
@@ -109,6 +116,8 @@ const StocksModule = () => {
     runIdRef.current += 1;
     scheduleLoop(runIdRef.current);
   };
+
+  const toggleTickerPaused = () => setIsTickerPaused((p) => !p);
 
   // Start/Restart the refresh loop when symbols/apiKey change
   useEffect(() => {
@@ -169,15 +178,32 @@ const StocksModule = () => {
           <span className={`w-1.5 h-5 ${theme.accentColor} rounded-full`} />
           <span className="truncate">Portfolio</span>
         </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <div className={`text-[10px] ${theme.textSecondary} whitespace-nowrap`}>
-            {error ? 'Error' : apiKey ? 'Live' : 'Needs API key'}
+        <div className="flex items-center -space-x-1 flex-shrink-0">
+          <div className={`text-[10px] ${theme.textSecondary} whitespace-nowrap mr-1`}>
+            {!apiKey ? 'Needs API key' : isRefreshing ? 'Updating' : isTickerPaused ? 'Paused' : 'Live'}
           </div>
+          <button
+            type="button"
+            onClick={toggleTickerPaused}
+            className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center ${isTickerPaused ? 'text-yellow-400' : theme.textSecondary}`}
+            title={isTickerPaused ? 'Resume ticker' : 'Pause ticker'}
+            aria-label={isTickerPaused ? 'Resume ticker' : 'Pause ticker'}
+          >
+            {isTickerPaused ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
           <button
             type="button"
             onClick={handleManualRefresh}
             disabled={!apiKey || isRefreshing}
-            className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[32px] min-h-[32px] flex items-center justify-center ${isRefreshing ? 'animate-spin opacity-60' : ''}`}
+            className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center ${isRefreshing ? 'animate-spin opacity-60' : ''}`}
             title="Refresh Portfolio"
             aria-label="Refresh Portfolio"
           >
@@ -193,16 +219,11 @@ const StocksModule = () => {
           Add a Stock API key in Settings to load quotes.
         </div>
       )}
-      {apiKey && error && (
-        <div className="text-xs text-red-300">
-          {error}
-        </div>
-      )}
 
       <div className="mt-0.5 relative flex-1 min-h-0 overflow-hidden stock-ticker-mask">
         <div
           ref={trackRef}
-          className="stock-ticker-track flex items-center gap-6 whitespace-nowrap will-change-transform"
+          className={`stock-ticker-track flex items-center gap-6 whitespace-nowrap will-change-transform ${isTickerPaused ? 'stock-ticker-paused' : ''}`}
           style={tickerStyle}
           aria-label="Scrolling stock ticker"
         >
@@ -211,16 +232,16 @@ const StocksModule = () => {
               <span className={`${theme.textPrimary} text-lg font-semibold tracking-wide`}>
                 {it.symbol}
               </span>
-              <span className={`${theme.textSecondary} text-sm tabular-nums`}>
-                {typeof it.price === 'number' && it.price > 0 ? it.price.toFixed(2) : '--'}
-              </span>
-              <span
-                className={`text-sm tabular-nums font-medium ${it.isUp ? 'text-emerald-300' : 'text-rose-300'}`}
-              >
-                {typeof it.changePct === 'number'
-                  ? `${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%`
-                  : ''}
-              </span>
+              {!isRateLimited && typeof it.price === 'number' && it.price > 0 && (
+                <span className={`${theme.textSecondary} text-sm tabular-nums`}>
+                  {it.price.toFixed(2)}
+                </span>
+              )}
+              {!isRateLimited && typeof it.changePct === 'number' && (
+                <span className={`text-sm tabular-nums font-medium ${it.isUp ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {`${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%`}
+                </span>
+              )}
             </div>
           ))}
         </div>

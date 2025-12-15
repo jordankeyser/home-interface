@@ -230,7 +230,7 @@ const TrainModule = () => {
                     <span className={`w-1.5 h-6 ${theme.accentColor} rounded-full`}></span>
                     <span className="truncate">{stationName || 'Trains'}</span>
                 </h2>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center -space-x-1 flex-shrink-0">
                     {lastUpdated && (
                         <span className={`text-[10px] ${theme.textSecondary} whitespace-nowrap hidden md:block mr-1`}>
                             Updated {lastUpdated.toLocaleTimeString()}
@@ -278,7 +278,7 @@ const TrainModule = () => {
                     {sortedDirections.length === 0 ? (
                         <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
                     ) : (
-                        sortedDirections.map(([direction, trains]) => (
+                    sortedDirections.map(([direction, trains], directionIndex) => (
                             <div key={direction}>
                                 <button
                                     type="button"
@@ -303,7 +303,10 @@ const TrainModule = () => {
                                     </span>
                                 </button>
                                 <div className="space-y-2 relative">
-                                    {trains.slice(0, expandedDirections.has(direction) ? 4 : 2).map((train) => {
+                                    {(() => {
+                                        const defaultCount = directionIndex === 0 ? 3 : 2;
+                                        const count = expandedDirections.has(direction) ? defaultCount + 2 : defaultCount;
+                                        return trains.slice(0, count).map((train) => {
                                         const mins = getMinutes(train.arrT);
                                         const isDue = mins === 'Due';
                                         const isExiting = exitingTrainIds.has(train.rn);
@@ -328,7 +331,8 @@ const TrainModule = () => {
                                                 </div>
                                             </div>
                                         );
-                                    })}
+                                        });
+                                    })()}
                                 </div>
                             </div>
                         ))
