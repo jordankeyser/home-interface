@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from '../../../context/SettingsContext';
 
-const REFRESH_ALL_MS = 60_000;
-// Alpha Vantage free tier is typically ~5 requests/min; keep us safely under that.
-const MAX_REQUESTS_PER_MIN = 5;
-const PER_REQUEST_DELAY_MS = Math.ceil(60_000 / MAX_REQUESTS_PER_MIN);
+// Target: update each symbol about once per minute, without exceeding ~1 request/sec.
+const TARGET_FULL_CYCLE_MS = 60_000;
+const MIN_REQUEST_INTERVAL_MS = 1100; // Alpha Vantage guidance: ~1 request/second
 const PX_PER_SECOND = 28; // slow, constant movement
 const MIN_DURATION_S = 18;
 
@@ -62,39 +61,41 @@ const StocksModule = () => {
   const [isTickerPaused, setIsTickerPaused] = useState(false);
 
   const runIdRef = useRef(0);
-  const timeoutRef = useRef(null);
+  const nextIndexRef = useRef(0);
 
   const trackRef = useRef(null);
   const [tickerStyle, setTickerStyle] = useState({});
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const getPerRequestIntervalMs = (count) => {
+    if (!count) return TARGET_FULL_CYCLE_MS;
+    return Math.max(MIN_REQUEST_INTERVAL_MS, Math.floor(TARGET_FULL_CYCLE_MS / count));
+  };
 
-  const refreshAll = async (runId) => {
+  const fetchNextSymbol = async (runId) => {
     if (!apiKey || symbols.length === 0) {
       setQuotes(new Map());
       setIsRateLimited(false);
       return;
     }
+    const idx = nextIndexRef.current % symbols.length;
+    nextIndexRef.current = (idx + 1) % symbols.length;
+    const sym = symbols[idx];
 
     setIsRefreshing(true);
     try {
-      const next = new Map(quotes);
-      for (let i = 0; i < symbols.length; i++) {
-        if (runIdRef.current !== runId) return; // cancelled/restarted
-        const sym = symbols[i];
-        // Spread requests to respect Alpha Vantage limits (no bursts)
-        if (i > 0) await sleep(PER_REQUEST_DELAY_MS);
-        const q = await fetchAlphaVantageQuote(sym, apiKey);
-        next.set(q.symbol, q);
-      }
+      const q = await fetchAlphaVantageQuote(sym, apiKey);
       if (runIdRef.current !== runId) return;
-      setQuotes(next);
+      setQuotes((prev) => {
+        const next = new Map(prev);
+        next.set(q.symbol, q);
+        return next;
+      });
       setIsRateLimited(false);
     } catch (e) {
       if (runIdRef.current !== runId) return;
-      // Do not surface errors to the UI; silently degrade to symbols-only.
-      const msg = String(e?.message || '');
-      if (msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('alpha vantage')) {
+      // Silent handling: keep last known quotes (if any) and hide values if rate-limited.
+      const msg = String(e?.message || '').toLowerCase();
+      if (msg.includes('rate limit') || msg.includes('alpha vantage')) {
         setIsRateLimited(true);
       }
     } finally {
@@ -102,32 +103,27 @@ const StocksModule = () => {
     }
   };
 
-  const scheduleLoop = (runId) => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    const tick = async () => {
-      await refreshAll(runId);
-      if (runIdRef.current !== runId) return;
-      timeoutRef.current = setTimeout(tick, REFRESH_ALL_MS);
-    };
-    tick();
-  };
-
   const handleManualRefresh = () => {
+    // Trigger an immediate single fetch (still rate-safe).
     runIdRef.current += 1;
-    scheduleLoop(runIdRef.current);
+    fetchNextSymbol(runIdRef.current);
   };
 
   const toggleTickerPaused = () => setIsTickerPaused((p) => !p);
 
-  // Start/Restart the refresh loop when symbols/apiKey change
+  // Start/Restart the refresh loop when symbols/apiKey change.
+  // We fetch one symbol per tick so we never burst requests.
   useEffect(() => {
     runIdRef.current += 1;
     const runId = runIdRef.current;
-    scheduleLoop(runId);
-    return () => {
-      runIdRef.current += 1;
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
+    nextIndexRef.current = 0;
+    setIsRateLimited(false);
+
+    // Kick off immediately, then tick at a rate that updates the full list ~once/min.
+    fetchNextSymbol(runId);
+    const interval = getPerRequestIntervalMs(symbols.length);
+    const id = setInterval(() => fetchNextSymbol(runId), interval);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [symbols.join(','), apiKey]);
 
