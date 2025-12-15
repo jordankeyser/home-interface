@@ -28,7 +28,7 @@ function App() {
               <TrainModule />
             </div>
             {/* Placeholder module for future content (slightly larger than the time module) */}
-            <div className="h-24 md:h-28 min-w-0">
+            <div className="h-20 md:h-24 min-w-0">
               <StocksModule />
             </div>
           </div>
