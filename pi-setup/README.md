@@ -184,6 +184,20 @@ the launcher is wired to the wrong mechanism. Re-run the installer with an
 explicit `LAUNCHER=` (see the table above). If the log shows it timing out
 waiting for `/healthz`, the control server is the problem, not the kiosk.
 
+**The panel shows the desktop, and the server keeps restarting.** Something else
+is holding port 3001, so the unit crash-loops on `EADDRINUSE`. Nearly always the
+pre-1.0 `server/displayServer.js`, which bound the same port and keeps running
+even though the file has been deleted:
+
+```bash
+sudo ss -ltnp | grep 3001
+pkill -f displayServer.js
+./pi-setup/install.sh
+```
+
+The installer now checks this before installing the unit, and removes whatever
+was starting the old server at boot (autostart files, crontab, stray units).
+
 **Brightness doesn't change.** If `/healthz` lists a backlight path, your `video`
 group membership hasn't taken effect — log out and back in, or reboot. Verify by
 hand:

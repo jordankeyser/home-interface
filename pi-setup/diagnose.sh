@@ -70,6 +70,27 @@ else
     echo "  journalctl not available"
 fi
 
+hr "port 3001"
+if have ss; then
+    LISTEN=$(sudo -n ss -ltnp 2>/dev/null | grep ':3001' ||
+        ss -ltnp 2>/dev/null | grep ':3001' || true)
+    if [[ -n "$LISTEN" ]]; then
+        echo "$LISTEN" | sed 's/^/  /'
+        if echo "$LISTEN" | grep -q 'displayServer'; then
+            echo ""
+            echo "  *** The pre-1.0 displayServer.js is holding the port. It keeps"
+            echo "      running even though the file was deleted, so the new unit"
+            echo "      crash-loops on EADDRINUSE. Fix:"
+            echo "        pkill -f displayServer.js && ./pi-setup/install.sh ***"
+        fi
+    else
+        echo "  nothing listening on 3001"
+    fi
+else
+    echo "  ss not available"
+fi
+echo "  legacy displayServer processes: $(pgrep -af 'displayServer\.js' 2>/dev/null || echo none)"
+
 hr "health endpoint"
 if curl -fsS --max-time 3 http://127.0.0.1:3001/healthz 2>/dev/null; then
     echo ""
@@ -120,6 +141,10 @@ if [[ -f "$KLOG" ]]; then
 else
     echo "  no kiosk log at $KLOG — kiosk-start.sh has not run"
 fi
+
+hr "crontab"
+crontab -l 2>/dev/null | grep -v '^#' | grep -v '^[[:space:]]*$' | sed 's/^/  /' ||
+    echo "  (empty)"
 
 hr "update log"
 if [[ -f "$APP_DIR/logs/update.log" ]]; then

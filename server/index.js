@@ -307,9 +307,14 @@ server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(
       `[fatal] port ${PORT} is already in use on ${HOST}.\n` +
-        '        Something else is bound to it — check:\n' +
-        '          sudo ss -ltnp | grep 3001\n' +
-        '          systemctl status home-interface-server'
+        '        Identify the process:\n' +
+        `          sudo ss -ltnp | grep ${PORT}\n` +
+        '        The usual culprit is the pre-1.0 server/displayServer.js, which\n' +
+        '        bound this port too and keeps running even though the file has\n' +
+        '        been deleted. If so:\n' +
+        '          pkill -f displayServer.js\n' +
+        '        then re-run pi-setup/install.sh, which also removes whatever\n' +
+        '        was starting it at boot.'
     );
   } else if (err.code === 'EACCES') {
     console.error(`[fatal] not allowed to bind ${HOST}:${PORT}: ${err.message}`);
