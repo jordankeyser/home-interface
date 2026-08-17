@@ -65,6 +65,16 @@ sudo systemctl restart home-interface-server
 journalctl -u home-interface-server -f
 ```
 
+**The port is not fixed.** The frontend only uses relative URLs, so the server
+binds 3001 or the next free port after it (up to 3010), and `kiosk-start.sh`
+probes that range for whichever port is actually serving the dashboard. A stale
+listener on 3001 therefore can't break the panel — it just moves over. Set
+`STRICT_PORT=1` to require the exact port and fail loudly instead.
+
+`/healthz` returns 503 unless there is a real build to serve, so the kiosk never
+points Chromium at a server that can only answer 404s. If there is genuinely no
+build, the page explains that instead of showing a bare "Not found".
+
 **`kiosk-start.sh` owns the whole stack and is the thing that must not fail.**
 It clears any stale listener on port 3001, makes sure the control server is
 running — asking systemd first, then starting it directly if systemd hasn't or

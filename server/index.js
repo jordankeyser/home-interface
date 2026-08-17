@@ -30,6 +30,8 @@ const DIST = path.join(ROOT, 'dist');
 
 const PORT = Number(process.env.PORT || 3001);
 const HOST = process.env.HOST || '127.0.0.1';
+/** Set once bound; may differ from PORT if it had to move (see listen() below). */
+let activePort = PORT;
 const CTA_ORIGIN = 'https://lapi.transitchicago.com';
 /** Set HOME_INTERFACE_ALLOW_POWER=0 to disable shutdown/reboot entirely. */
 const ALLOW_POWER = process.env.HOME_INTERFACE_ALLOW_POWER !== '0';
@@ -135,6 +137,31 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+/**
+ * Shown instead of a bare JSON 404 when there is no build to serve. On a wall
+ * panel an unexplained white page reading "Not found" is the worst possible
+ * outcome — say what's wrong and how to fix it.
+ */
+const buildMissingPage = () => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Home Interface — no build</title>
+<style>
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;
+    background:#06080d;color:#f3f6fa;
+    font:16px/1.6 ui-sans-serif,system-ui,sans-serif;text-align:center}
+  div{max-width:34rem;padding:2rem}
+  h1{font-size:1.6rem;margin:0 0 .75rem}
+  p{color:#93a1b5;margin:.5rem 0}
+  code{background:#ffffff14;padding:.2em .45em;border-radius:.3em;color:#35b6ff}
+</style></head><body><div>
+<h1>No build to serve</h1>
+<p>The control server is running, but <code>dist/index.html</code> is missing.</p>
+<p>Build it and the panel will load on the next refresh:</p>
+<p><code>cd ~/Desktop/home-interface &amp;&amp; npm run build</code></p>
+</div></body></html>`;
+
 const serveStatic = async (req, res) => {
   const urlPath = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
   const requested = path.join(DIST, urlPath);
@@ -152,6 +179,17 @@ const serveStatic = async (req, res) => {
   } catch {
     // SPA fallback.
     filePath = path.join(DIST, 'index.html');
+  }
+
+  // No build at all — explain it on screen rather than returning a JSON 404.
+  if (!fs.existsSync(path.join(DIST, 'index.html'))) {
+    const body = buildMissingPage();
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Length': Buffer.byteLength(body),
+      'Cache-Control': 'no-store',
+    });
+    return res.end(body);
   }
 
   try {
@@ -234,11 +272,17 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.method === 'GET' && pathname === '/healthz') {
-      return send(res, 200, {
-        ok: true,
+      const servingDist = fs.existsSync(path.join(DIST, 'index.html'));
+      // `ok` means "actually able to serve the dashboard". It used to report
+      // true with no build present, so the kiosk treated a server that could
+      // only return 404s as healthy and pointed Chromium at it.
+      return send(res, servingDist ? 200 : 503, {
+        ok: servingDist,
+        app: 'home-interface',
+        port: activePort,
         backlight: backlight?.path || null,
         powerEnabled: ALLOW_POWER,
-        servingDist: fs.existsSync(path.join(DIST, 'index.html')),
+        servingDist,
       });
     }
 
@@ -300,30 +344,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// Without these, any startup failure (a bind error, a bad path, a permission
-// problem under systemd hardening) exits with code 1 and logs nothing at all —
-// which is exactly how this service came to crash-loop invisibly.
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(
-      `[fatal] port ${PORT} is already in use on ${HOST}.\n` +
-        '        Identify the process:\n' +
-        `          sudo ss -ltnp | grep ${PORT}\n` +
-        '        The usual culprit is the pre-1.0 server/displayServer.js, which\n' +
-        '        bound this port too and keeps running even though the file has\n' +
-        '        been deleted. If so:\n' +
-        '          pkill -f displayServer.js\n' +
-        '        then re-run pi-setup/install.sh, which also removes whatever\n' +
-        '        was starting it at boot.'
-    );
-  } else if (err.code === 'EACCES') {
-    console.error(`[fatal] not allowed to bind ${HOST}:${PORT}: ${err.message}`);
-  } else {
-    console.error(`[fatal] server error: ${err.code || ''} ${err.message}`);
-  }
-  process.exit(1);
-});
-
+// Without these, any startup failure exits with code 1 and logs nothing at all —
+// which is how this service once came to crash-loop invisibly.
 process.on('uncaughtException', (err) => {
   console.error(`[fatal] uncaught exception: ${err?.stack || err}`);
   process.exit(1);
@@ -334,13 +356,57 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`Home Interface server → http://${HOST}:${PORT}`);
-  console.log(`  node:      ${process.version} on ${process.platform}`);
-  console.log(`  static:    ${fs.existsSync(DIST) ? DIST : `${DIST} (NOT BUILT — run: npm run build)`}`);
-  console.log(`  backlight: ${backlight ? `${backlight.path} (max ${backlight.max})` : 'not found — will try vcgencmd/xset'}`);
-  console.log(`  power:     ${ALLOW_POWER ? 'enabled' : 'disabled'}`);
-});
+/**
+ * Bind PORT, or the next free port after it.
+ *
+ * The frontend only ever uses relative URLs, so the actual port is irrelevant to
+ * the app — which makes fighting over 3001 pointless. If something else holds
+ * it (classically the pre-1.0 displayServer.js, which keeps running after the
+ * file is deleted), move over instead of crash-looping. kiosk-start.sh probes
+ * for whichever port is serving the dashboard.
+ *
+ * Set STRICT_PORT=1 to require the exact port and fail loudly instead.
+ */
+const STRICT_PORT = process.env.STRICT_PORT === '1';
+const MAX_PORT_ATTEMPTS = STRICT_PORT ? 1 : 10;
+
+const listen = (port, attempt = 1) => {
+  const onError = (err) => {
+    if (err.code === 'EADDRINUSE' && attempt < MAX_PORT_ATTEMPTS) {
+      console.warn(`[warn] port ${port} is in use, trying ${port + 1}`);
+      server.removeListener('error', onError);
+      listen(port + 1, attempt + 1);
+      return;
+    }
+
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        `[fatal] no free port in ${PORT}–${PORT + MAX_PORT_ATTEMPTS - 1} on ${HOST}.\n` +
+          `        Identify what's holding them: sudo ss -ltnp | grep ${PORT}`
+      );
+    } else if (err.code === 'EACCES') {
+      console.error(`[fatal] not allowed to bind ${HOST}:${port}: ${err.message}`);
+    } else {
+      console.error(`[fatal] server error: ${err.code || ''} ${err.message}`);
+    }
+    process.exit(1);
+  };
+
+  server.once('error', onError);
+  server.listen(port, HOST, () => {
+    server.removeListener('error', onError);
+    activePort = port;
+
+    const built = fs.existsSync(path.join(DIST, 'index.html'));
+    console.log(`Home Interface server → http://${HOST}:${port}`);
+    console.log(`  node:      ${process.version} on ${process.platform}`);
+    console.log(`  static:    ${built ? DIST : `${DIST} (NOT BUILT — run: npm run build)`}`);
+    console.log(`  backlight: ${backlight ? `${backlight.path} (max ${backlight.max})` : 'not found — will try vcgencmd/xset'}`);
+    console.log(`  power:     ${ALLOW_POWER ? 'enabled' : 'disabled'}`);
+  });
+};
+
+listen(PORT);
 
 const shutdown = () => {
   server.close(() => process.exit(0));

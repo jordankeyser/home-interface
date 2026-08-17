@@ -31,7 +31,30 @@ NODE_BIN="$(command -v node || echo /usr/bin/node)"
 log "starting (session=${XDG_SESSION_TYPE:-unknown} wayland=${WAYLAND_DISPLAY:-none} display=${DISPLAY:-none})"
 log "app dir: $APP_DIR"
 
-healthy() { curl -fsS --max-time 2 "$APP_URL/healthz" >/dev/null 2>&1; }
+# "Healthy" must mean "this is OUR server AND it has a build to serve".
+# Checking only for a 200 was how Chromium ended up pointed at a server that
+# could only return 404s — a white "Not found" page on the wall.
+healthy_at() { # $1 = port
+    curl -fsS --max-time 2 "http://127.0.0.1:$1/healthz" 2>/dev/null |
+        grep -q '"app":"home-interface"' || return 1
+    curl -fsS --max-time 2 "http://127.0.0.1:$1/healthz" 2>/dev/null |
+        grep -q '"servingDist":true'
+}
+
+healthy() { healthy_at "$PORT"; }
+
+# The frontend uses only relative URLs, so any port works. Find one that is
+# actually serving the dashboard rather than insisting on 3001.
+find_serving_port() {
+    local p
+    for p in $(seq "$PORT" $((PORT + 9))); do
+        if healthy_at "$p"; then
+            echo "$p"
+            return 0
+        fi
+    done
+    return 1
+}
 
 port_busy() {
     if command -v ss >/dev/null 2>&1; then
@@ -41,10 +64,14 @@ port_busy() {
     fi
 }
 
-wait_healthy() { # $1 = seconds
-    local waited=0
+# Waits for any port in range to serve the dashboard; sets APP_URL to it.
+wait_serving() { # $1 = seconds
+    local waited=0 found
     while ((waited < $1)); do
-        healthy && return 0
+        if found=$(find_serving_port); then
+            APP_URL="http://127.0.0.1:$found"
+            return 0
+        fi
         sleep 1
         waited=$((waited + 1))
     done
@@ -53,8 +80,10 @@ wait_healthy() { # $1 = seconds
 
 # --- 1..2: make sure the control server is up -------------------------------
 ensure_server() {
-    if healthy; then
-        log "control server already healthy"
+    local found
+    if found=$(find_serving_port); then
+        APP_URL="http://127.0.0.1:$found"
+        log "dashboard already being served on port $found"
         return 0
     fi
 
@@ -77,8 +106,8 @@ ensure_server() {
         sudo -n /usr/bin/systemctl restart home-interface-server.service 2>/dev/null ||
             systemctl --user restart home-interface-server.service 2>/dev/null ||
             log "  (couldn't drive systemd; will fall back to running it directly)"
-        wait_healthy 20 && {
-            log "control server up via systemd"
+        wait_serving 20 && {
+            log "control server up via systemd at $APP_URL"
             return 0
         }
     fi
@@ -98,17 +127,24 @@ ensure_server() {
             >>"$LOG_DIR/server.log" 2>&1 &
     fi
 
-    wait_healthy 30 && {
-        log "control server up (direct)"
+    wait_serving 30 && {
+        log "control server up (direct) at $APP_URL"
         return 0
     }
 
-    log "WARNING: control server still not healthy — see $LOG_DIR/server.log"
-    log "         launching the browser anyway so the panel isn't left blank"
+    log "WARNING: nothing is serving the dashboard — see $LOG_DIR/server.log"
     return 1
 }
 
-ensure_server || true
+# Keep trying rather than giving up or pointing Chromium at a 404. A white
+# "Not found" page on the wall is worse than a few more seconds of waiting.
+round=0
+until ensure_server; do
+    round=$((round + 1))
+    log "retry $round in 15s (will keep trying; check $LOG_DIR/server.log)"
+    sleep 15
+done
+log "serving from $APP_URL"
 
 # --- display server setup ---------------------------------------------------
 PLATFORM=x11
@@ -178,7 +214,10 @@ while true; do
     code=$?
     log "chromium exited (code $code) — restarting in 5s"
 
-    # If the server went away in the meantime, bring it back too.
-    healthy || ensure_server || true
+    # If the server went away in the meantime, bring it back before relaunching.
+    until ensure_server; do
+        log "server unavailable; retrying in 15s"
+        sleep 15
+    done
     sleep 5
 done
