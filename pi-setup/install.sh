@@ -157,18 +157,17 @@ for unit in /etc/systemd/system/*display*.service /etc/systemd/system/*home-inte
     fi
 done
 
-# Anything still holding the port has to be dealt with by hand — installing the
-# unit on top of it would just recreate the crash loop.
+# Warn but keep going if something foreign still holds the port. kiosk-start.sh
+# clears stale listeners and can run the server itself, so the panel still comes
+# up — aborting the install here would leave the Pi worse off, not better.
 if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -qE '127\.0\.0\.1:3001|0\.0\.0\.0:3001|\*:3001'; then
     echo ""
-    echo "  ERROR: something is still listening on port 3001:"
+    echo "  WARNING: something is still listening on port 3001:"
     sudo ss -ltnp 2>/dev/null | grep ':3001' | sed 's/^/    /'
-    echo ""
-    echo "  The control server cannot start until that process is stopped."
-    echo "  Identify and stop it, then re-run this script."
-    exit 1
+    echo "  Continuing — kiosk-start.sh will try to clear it at boot."
+else
+    echo "  port 3001 is free"
 fi
-echo "  port 3001 is free"
 
 step "Installing the control server service"
 sed -e "s|__USER__|$KIOSK_USER|g" \

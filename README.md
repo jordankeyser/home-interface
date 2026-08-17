@@ -159,6 +159,10 @@ wired, whether the control server is answering, and the tail of the kiosk log.
   glyph instead of replacing the panel with an error, and a network-off icon
   appears next to the clock.
 - **Reduced motion** is respected via `prefers-reduced-motion`.
+- **Boot is self-healing**: `pi-setup/kiosk-start.sh` clears stale listeners on
+  the control port, starts the control server itself if systemd hasn't, launches
+  Chromium regardless, and relaunches it if it exits. The panel comes up on boot
+  even if the service unit is broken.
 
 ## Troubleshooting
 

@@ -65,6 +65,14 @@ sudo systemctl restart home-interface-server
 journalctl -u home-interface-server -f
 ```
 
+**`kiosk-start.sh` owns the whole stack and is the thing that must not fail.**
+It clears any stale listener on port 3001, makes sure the control server is
+running — asking systemd first, then starting it directly if systemd hasn't or
+can't — launches Chromium whether or not the server came up, and relaunches
+Chromium if it ever exits. The panel is designed to appear on boot even when
+something else is broken; an earlier version only waited on the systemd unit and
+gave up, so one bad unit file meant nothing but the desktop.
+
 **The kiosk** is launched by the graphical session, *not* by systemd. A systemd
 unit bound to `graphical.target` cannot reach a user session and never fires at
 all on an image with no desktop — which is what broke startup once before. The
