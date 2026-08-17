@@ -117,7 +117,7 @@ const TrainModule = () => {
 
   return (
     <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
-      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+      <div className="mb-1.5 flex shrink-0 items-center justify-between gap-3">
         <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
           <TrainIcon className="h-6 w-6 shrink-0 text-accent" />
           <span className="truncate">{stationName || 'Arrivals'}</span>
@@ -170,7 +170,7 @@ const TrainModule = () => {
             No trains scheduled
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {groups.map(([direction, trains]) => {
               const isOpen = expanded.has(direction);
               const limit = isOpen ? EXPANDED_ROWS : COLLAPSED_ROWS;
@@ -182,7 +182,7 @@ const TrainModule = () => {
                     type="button"
                     onClick={() => hasMore && toggle(direction)}
                     disabled={!hasMore}
-                    className="mb-2 flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl px-1 text-left disabled:cursor-default"
+                    className="mb-1.5 flex min-h-[40px] w-full items-center justify-between gap-2 rounded-xl px-1 text-left disabled:cursor-default"
                     aria-expanded={isOpen}
                     aria-label={`${isOpen ? 'Show fewer' : 'Show more'} trains toward ${direction}`}
                   >
@@ -205,11 +205,11 @@ const TrainModule = () => {
                       return (
                         <div
                           key={train.rn}
-                          className="card-inset card-inset-hover flex items-center justify-between gap-3 px-3 py-2.5"
+                          className="card-inset card-inset-hover flex items-center justify-between gap-3 px-3 py-2"
                         >
                           <div className="flex min-w-0 items-center gap-3">
                             <span
-                              className="h-7 w-1.5 shrink-0 rounded-full"
+                              className="h-6 w-1.5 shrink-0 rounded-full"
                               style={{
                                 backgroundColor:
                                   LINE_COLORS[train.rt] || 'var(--fg-faint)',

@@ -36,8 +36,8 @@ const ClockBar = ({ onSettingsClick }) => {
   const [clock, meridiem] = time.split(' ');
 
   return (
-    <div className="card flex shrink-0 items-center justify-between gap-4 px-6 py-5">
-      <div className="min-w-0">
+    <div className="card relative flex shrink-0 items-center px-6 py-5">
+      <div className="min-w-0 pr-12">
         <div className="flex items-baseline gap-2">
           <span className="nums text-6xl leading-none font-semibold tracking-tight text-fg">
             {clock}
@@ -55,10 +55,13 @@ const ClockBar = ({ onSettingsClick }) => {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
+      {/* Anchored to the card's actual top-right corner, matching the
+          refresh-button placement in Weather/Train, rather than floating
+          mid-height alongside the clock text. */}
+      <div className="absolute top-3 right-3 z-20 flex items-center gap-1">
         {!online && (
           <span
-            className="flex h-12 w-12 items-center justify-center text-warning"
+            className="flex h-10 w-10 items-center justify-center text-warning"
             title="No network connection"
           >
             <OfflineIcon className="h-5 w-5" />

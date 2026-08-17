@@ -25,6 +25,14 @@ const Stat = ({ icon: Icon, label, value, unit }) => (
 const WeatherModule = () => {
   const { weather, locationName, loading, error, stale, refresh } = useWeather();
 
+  // Six columns is what actually fits this card's width at 1024x600 without
+  // scrolling. The previous version sliced 12 hours into a horizontally
+  // scrolling row with a fade at the edge — at this card's width the 7th item
+  // landed mid-column, so it read as visually cut off rather than "swipe for
+  // more" (nothing on a kiosk suggests that gesture). Fixed to a grid that
+  // exactly fills the width instead.
+  const HOURS_SHOWN = 6;
+
   const hourly = useMemo(() => {
     if (!weather?.hourly?.time) return [];
 
@@ -35,7 +43,7 @@ const WeatherModule = () => {
     const start = weather.hourly.time.findIndex((t) => t >= anchor);
     if (start < 0) return [];
 
-    return weather.hourly.time.slice(start, start + 12).map((time, i) => ({
+    return weather.hourly.time.slice(start, start + HOURS_SHOWN).map((time, i) => ({
       time,
       temp: weather.hourly.temperature_2m[start + i],
       code: weather.hourly.weather_code[start + i],
@@ -124,15 +132,11 @@ const WeatherModule = () => {
       <div className="relative z-10 shrink-0 px-3 pb-3">
         <div className="divider mb-2" />
 
-        <div
-          className="scroll-x scrollbar-hide edge-fade-x flex gap-1 pb-1"
-          style={{ scrollSnapType: 'x proximity' }}
-        >
+        <div className="grid grid-cols-6 gap-1">
           {hourly.map((hour) => (
             <div
               key={hour.time}
-              className="flex min-w-[3.5rem] shrink-0 flex-col items-center gap-1.5 rounded-xl py-1.5"
-              style={{ scrollSnapAlign: 'start' }}
+              className="flex flex-col items-center gap-1.5 rounded-xl py-1.5"
             >
               <span className="text-xs font-medium text-fg-faint">
                 {new Date(hour.time)

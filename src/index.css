@@ -70,6 +70,12 @@
   /* Elevation — one soft shadow, not three stacked insets */
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.05) inset,
     0 18px 48px -12px rgb(0 0 0 / 0.7);
+
+  /* Glass — a bright top edge and a soft light source catching the upper-left
+     of each surface, the way light catches a curved sheet of glass. */
+  --sheen-edge: rgb(255 255 255 / 0.16);
+  --sheen-glow: rgb(255 255 255 / 0.09);
+  --sheen-inner: rgb(255 255 255 / 0.05);
 }
 
 [data-theme='light'] {
@@ -102,6 +108,10 @@
 
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.9) inset,
     0 14px 36px -14px rgb(15 23 42 / 0.28);
+
+  --sheen-edge: rgb(255 255 255 / 0.75);
+  --sheen-glow: rgb(255 255 255 / 0.55);
+  --sheen-inner: rgb(255 255 255 / 0.35);
 }
 
 /* Expose the tokens to Tailwind as utilities: bg-surface, text-fg, border-line…
@@ -186,21 +196,44 @@ body {
    Components — one confident surface, one hairline, one soft shadow.
    --------------------------------------------------------------------------- */
 @layer components {
+  /* Liquid-glass surface: a bright hairline along the top edge (light
+     catching the rim of a curved glass sheet), a soft glow in the upper-left
+     where that light pools, heavier blur/saturation so what's behind truly
+     reads through, and a taller corner radius for the rounder, more
+     continuous curve Apple's glass materials use. */
   .card {
     position: relative;
-    border-radius: 1.5rem;
+    isolation: isolate;
+    border-radius: 1.75rem;
     background-color: var(--surface);
     border: 1px solid var(--line);
-    box-shadow: var(--shadow-card);
-    backdrop-filter: blur(24px) saturate(140%);
-    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    box-shadow: var(--shadow-card), inset 0 1px 0 0 var(--sheen-edge),
+      inset 0 0 0 1px var(--sheen-inner);
+    backdrop-filter: blur(32px) saturate(165%);
+    -webkit-backdrop-filter: blur(32px) saturate(165%);
     transition: background-color 250ms ease, border-color 250ms ease;
   }
 
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(
+      120% 65% at 18% -12%,
+      var(--sheen-glow),
+      transparent 60%
+    );
+    pointer-events: none;
+  }
+
   .card-inset {
+    position: relative;
     border-radius: 1rem;
     background-color: var(--surface-inset);
     border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 0 var(--sheen-inner);
     transition: background-color 200ms ease, border-color 200ms ease;
   }
 
@@ -208,7 +241,9 @@ body {
     background-color: var(--surface-hover);
   }
 
-  /* Every tappable control: 48px minimum, no exceptions. */
+  /* Every tappable control: 48px minimum, no exceptions. Visible as a glass
+     pill at rest — Apple's floating glass controls (Camera, Maps) are always
+     a frosted, lit shape, never fully invisible until touched. */
   .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -217,12 +252,15 @@ body {
     min-height: 48px;
     border-radius: 9999px;
     color: var(--fg-muted);
-    background-color: transparent;
-    border: 0;
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 0 var(--sheen-edge);
+    backdrop-filter: blur(20px) saturate(165%);
+    -webkit-backdrop-filter: blur(20px) saturate(165%);
     cursor: pointer;
     touch-action: manipulation;
     transition: background-color 150ms ease, color 150ms ease,
-      transform 150ms ease;
+      transform 150ms ease, border-color 150ms ease;
   }
 
   .icon-btn:hover {
@@ -266,6 +304,9 @@ body {
     font-weight: 600;
     cursor: pointer;
     touch-action: manipulation;
+    box-shadow: inset 0 1px 0 0 var(--sheen-edge);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
     transition: background-color 150ms ease, border-color 150ms ease,
       transform 150ms ease;
   }
@@ -499,18 +540,6 @@ body {
   );
 }
 
-/* Fades a horizontally-scrolling row at its right edge so it reads as
-   continuing off-card rather than being abruptly clipped. */
-.edge-fade-x {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    black 0%,
-    black 88%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(to right, black 0%, black 88%, transparent 100%);
-}
-
 .train-scroll-mask {
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -557,28 +586,17 @@ textarea {
   touch-action: pan-y;
 }
 
-.scroll-x {
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-x;
-}
-
 /* Thick enough to grab with a fingertip. */
-.scroll-y::-webkit-scrollbar,
-.scroll-x::-webkit-scrollbar {
+.scroll-y::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-.scroll-y::-webkit-scrollbar-track,
-.scroll-x::-webkit-scrollbar-track {
+.scroll-y::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.scroll-y::-webkit-scrollbar-thumb,
-.scroll-x::-webkit-scrollbar-thumb {
+.scroll-y::-webkit-scrollbar-thumb {
   background: var(--line-strong);
   border-radius: 9999px;
 }

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useSettings } from '../hooks/useSettings';
 import { useDisplay } from '../hooks/useDisplay';
 import { themes } from '../config/themes';
-import { PROVIDERS } from '../lib/stockProviders';
 import { shutdownHost } from '../lib/displayApi';
 import ConfirmDialog from './ConfirmDialog';
 import {
@@ -121,8 +120,6 @@ const SettingsModal = ({ onClose }) => {
     onClose();
   };
 
-  const provider = PROVIDERS[form.stockProvider] || PROVIDERS.finnhub;
-
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-canvas">
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-3">
@@ -175,54 +172,6 @@ const SettingsModal = ({ onClose }) => {
               />
             </Section>
 
-            <Section title="Markets">
-              <div>
-                <span className="label">Quote provider</span>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.values(PROVIDERS).map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => set({ stockProvider: p.id })}
-                      className="btn"
-                      style={
-                        form.stockProvider === p.id
-                          ? {
-                              backgroundColor: 'var(--accent)',
-                              color: 'var(--accent-fg)',
-                              borderColor: 'transparent',
-                            }
-                          : undefined
-                      }
-                    >
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-1.5 text-xs text-fg-faint">{provider.hint}</p>
-              </div>
-
-              <SecretField
-                label={`${provider.name} API key`}
-                name="stockApiKey"
-                value={form.stockApiKey}
-                onChange={handleChange}
-                placeholder="Required to load quotes"
-                hint={`Get a free key at ${provider.keyUrl}`}
-              />
-
-              <Field
-                label="Symbols"
-                name="stockSymbols"
-                value={form.stockSymbols}
-                onChange={handleChange}
-                placeholder="AAPL, MSFT, TSLA"
-                hint="Comma-separated, up to 12 tickers"
-              />
-            </Section>
-          </div>
-
-          <div className="space-y-4">
             <Section title="Appearance">
               <div className="grid grid-cols-2 gap-2">
                 {themes.map((theme) => (
@@ -253,7 +202,9 @@ const SettingsModal = ({ onClose }) => {
                 onChange={(v) => set({ isPiMode: v })}
               />
             </Section>
+          </div>
 
+          <div className="space-y-4">
             <Section title="Display">
               <div>
                 <span className="label">Sleep after inactivity</span>

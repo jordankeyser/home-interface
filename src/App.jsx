@@ -5,7 +5,6 @@ import Layout from './components/Layout';
 import ClockBar from './components/ClockBar';
 import WeatherModule from './components/modules/Weather/WeatherModule';
 import TrainModule from './components/modules/Train/TrainModule';
-import StocksModule from './components/modules/Stocks/StocksModule';
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -24,14 +23,9 @@ function App() {
             </div>
           </div>
 
-          {/* Right: arrivals over the market ticker */}
-          <div className="flex h-full min-h-0 min-w-0 flex-col gap-4">
-            <div className="min-h-0 min-w-0 flex-1">
-              <TrainModule />
-            </div>
-            <div className="h-[76px] shrink-0 min-w-0">
-              <StocksModule />
-            </div>
+          {/* Right: arrivals, full column height */}
+          <div className="h-full min-h-0 min-w-0">
+            <TrainModule />
           </div>
         </Layout>
       </SleepMode>

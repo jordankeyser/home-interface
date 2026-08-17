@@ -12,9 +12,6 @@ export const DEFAULT_SETTINGS = {
   ctaApiKey: '',
   ctaStationId: '40380',
   zipCode: '60601',
-  stockProvider: 'finnhub',
-  stockApiKey: '',
-  stockSymbols: 'AAPL, MSFT, TSLA',
   /** Minutes of inactivity before the panel sleeps. 0 disables sleep. */
   idleSleepMinutes: 3,
   /** Preview the 1024x600 panel while developing on a desktop browser. */
