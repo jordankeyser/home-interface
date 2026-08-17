@@ -12,7 +12,7 @@
 set -uo pipefail
 
 APP_URL="${APP_URL:-http://127.0.0.1:3001}"
-READY_TIMEOUT="${READY_TIMEOUT:-90}"
+# (no readiness timeout — see the wait loop below)
 LOG_DIR="${LOG_DIR:-$HOME/.local/state/home-interface}"
 
 mkdir -p "$LOG_DIR"
@@ -24,18 +24,21 @@ log "starting (session=${XDG_SESSION_TYPE:-unknown} wayland=${WAYLAND_DISPLAY:-n
 
 # --- wait for the control server -------------------------------------------
 # systemd starts it first, but ordering is not a readiness guarantee.
+#
+# This waits indefinitely rather than giving up. The session autostart runs this
+# script exactly once, so exiting on a timeout leaves the user staring at a bare
+# desktop with no way back — whereas a server that recovers two minutes late
+# should still produce a dashboard.
 log "waiting for ${APP_URL} ..."
-deadline=$((SECONDS + READY_TIMEOUT))
+waited=0
 until curl -fsS --max-time 2 "${APP_URL}/healthz" >/dev/null 2>&1; do
-    if ((SECONDS >= deadline)); then
-        log "ERROR: control server not ready after ${READY_TIMEOUT}s"
-        log "       check: systemctl status home-interface-server"
-        log "       and:   journalctl -u home-interface-server -n 50"
-        exit 1
+    sleep 2
+    waited=$((waited + 2))
+    if ((waited % 30 == 0)); then
+        log "still waiting (${waited}s) — check: systemctl status home-interface-server"
     fi
-    sleep 1
 done
-log "control server is up"
+log "control server is up after ${waited}s"
 
 # --- figure out the display server -----------------------------------------
 PLATFORM=x11

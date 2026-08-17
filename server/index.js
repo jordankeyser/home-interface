@@ -300,9 +300,39 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Without these, any startup failure (a bind error, a bad path, a permission
+// problem under systemd hardening) exits with code 1 and logs nothing at all —
+// which is exactly how this service came to crash-loop invisibly.
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `[fatal] port ${PORT} is already in use on ${HOST}.\n` +
+        '        Something else is bound to it — check:\n' +
+        '          sudo ss -ltnp | grep 3001\n' +
+        '          systemctl status home-interface-server'
+    );
+  } else if (err.code === 'EACCES') {
+    console.error(`[fatal] not allowed to bind ${HOST}:${PORT}: ${err.message}`);
+  } else {
+    console.error(`[fatal] server error: ${err.code || ''} ${err.message}`);
+  }
+  process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error(`[fatal] uncaught exception: ${err?.stack || err}`);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error(`[fatal] unhandled rejection: ${reason?.stack || reason}`);
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, () => {
   console.log(`Home Interface server → http://${HOST}:${PORT}`);
-  console.log(`  static:    ${fs.existsSync(DIST) ? DIST : `${DIST} (not built yet)`}`);
+  console.log(`  node:      ${process.version} on ${process.platform}`);
+  console.log(`  static:    ${fs.existsSync(DIST) ? DIST : `${DIST} (NOT BUILT — run: npm run build)`}`);
   console.log(`  backlight: ${backlight ? `${backlight.path} (max ${backlight.max})` : 'not found — will try vcgencmd/xset'}`);
   console.log(`  power:     ${ALLOW_POWER ? 'enabled' : 'disabled'}`);
 });

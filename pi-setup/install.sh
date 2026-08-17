@@ -146,6 +146,45 @@ fi
 step "Wiring kiosk startup ($LAUNCHER)"
 KIOSK_CMD="$APP_DIR/pi-setup/kiosk-start.sh"
 
+# Remove every launcher hook first, then add back only the chosen one. Leaving
+# stale hooks in place starts several Chromium instances against different
+# displays at once — a console X server on :0 racing the desktop session on :1.
+clear_launcher_hooks() {
+    rm -f "$HOME/.xinitrc" "$HOME/.xinitrc.home-interface.bak"
+
+    # Neuter any startx-on-login block without breaking the enclosing if/fi
+    # (an emptied if body is a shell syntax error, which would break login).
+    if [[ -f "$HOME/.bash_profile" ]] && grep -q startx "$HOME/.bash_profile" 2>/dev/null; then
+        sed -i 's|^\([[:space:]]*\)\(exec[[:space:]]\+\)\?startx.*|\1true  # startx disabled by home-interface installer|' \
+            "$HOME/.bash_profile"
+    fi
+
+    for f in "$HOME/.config/labwc/autostart" \
+        "$HOME/.config/lxsession/LXDE-pi/autostart"; do
+        [[ -f "$f" ]] || continue
+        grep -v 'kiosk-start.sh' "$f" >"$f.tmp" 2>/dev/null || true
+        mv "$f.tmp" "$f"
+    done
+
+    [[ -f "$HOME/.config/wayfire.ini" ]] &&
+        sed -i '/home_interface/d' "$HOME/.config/wayfire.ini"
+
+    # tty1 autologin belongs to the console path only; a display manager does
+    # its own autologin and the two fight over the console.
+    if [[ "$LAUNCHER" != "xinit" ]] &&
+        [[ -e /etc/systemd/system/display-manager.service ]] &&
+        [[ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]]; then
+        sudo rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
+        sudo systemctl daemon-reload
+        echo "  removed tty1 autologin (lightdm handles login on this image)"
+    fi
+
+    return 0
+}
+
+clear_launcher_hooks
+echo "  cleared previous launcher hooks"
+
 case "$LAUNCHER" in
 xinit)
     # tty1 autologin -> .bash_profile runs startx -> .xinitrc execs the kiosk.
@@ -161,9 +200,9 @@ EOF
     sudo systemctl daemon-reload
     echo "  tty1 autologin configured"
 
-    # Match any startx block, not just ours — earlier versions of this script
-    # added one without a marker, and appending a second is pointless churn.
-    if ! grep -q "startx" "$HOME/.bash_profile" 2>/dev/null; then
+    # Match our marker, not bare "startx": clear_launcher_hooks leaves a
+    # "startx disabled by ..." comment behind, which a bare grep would match.
+    if ! grep -q "home-interface: autostart X" "$HOME/.bash_profile" 2>/dev/null; then
         cat >>"$HOME/.bash_profile" <<'EOF'
 
 # home-interface: autostart X on tty1 login
@@ -176,8 +215,6 @@ EOF
         echo "  ~/.bash_profile already configured"
     fi
 
-    # Restore any .xinitrc an earlier run of this script moved aside.
-    [[ -f "$HOME/.xinitrc.home-interface.bak" ]] && rm -f "$HOME/.xinitrc.home-interface.bak"
     cat >"$HOME/.xinitrc" <<EOF
 #!/bin/bash
 # home-interface kiosk

@@ -25,17 +25,27 @@ echo "display mgr:     $([[ -e /etc/systemd/system/display-manager.service ]] &&
 
 hr "startup mechanism"
 echo "boot: which of these exists determines how the kiosk launches"
+WIRED=0
 for f in "$HOME/.xinitrc" \
     "$HOME/.config/labwc/autostart" \
     "$HOME/.config/wayfire.ini" \
     "$HOME/.config/lxsession/LXDE-pi/autostart"; do
-    if [[ -e "$f" ]]; then
-        printf '  [x] %s\n' "$f"
-        sed 's/^/        /' "$f" | grep -v '^\s*$' | head -8
+    if [[ -e "$f" ]] && grep -q 'kiosk-start.sh\|home_interface' "$f" 2>/dev/null; then
+        printf '  [x] %s   <- launches the kiosk\n' "$f"
+        sed 's/^/        /' "$f" | grep -v '^[[:space:]]*$' | head -8
+        WIRED=$((WIRED + 1))
+    elif [[ -e "$f" ]]; then
+        printf '  [-] %s   (exists, no kiosk entry)\n' "$f"
     else
         printf '  [ ] %s\n' "$f"
     fi
 done
+if ((WIRED > 1)); then
+    echo ""
+    echo "  *** $WIRED launchers are wired at once. They will race and start"
+    echo "      several Chromium instances on different displays. Re-run"
+    echo "      ./pi-setup/install.sh to clear the stale ones. ***"
+fi
 
 echo "  tty1 autologin:  $([[ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]] &&
     echo yes || echo no)"
@@ -51,6 +61,13 @@ if have systemctl; then
     systemctl status home-interface-server.service --no-pager -n 15 2>&1 | sed 's/^/  /' || true
 else
     echo "systemctl not available on this host"
+fi
+
+hr "control server log (this is what to read if it is crash-looping)"
+if have journalctl; then
+    journalctl -u home-interface-server.service -n 40 --no-pager 2>&1 | sed 's/^/  /'
+else
+    echo "  journalctl not available"
 fi
 
 hr "health endpoint"
