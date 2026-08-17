@@ -65,6 +65,23 @@ sudo systemctl restart home-interface-server
 journalctl -u home-interface-server -f
 ```
 
+## Runtime
+
+The UI is served by **Vite's own dev server on :5173** — the configuration this
+panel ran on for months before the 1.0 rewrite, and the only one proven on this
+hardware. It also can't suffer the stale-build failure that produced a blank
+white screen, because there is no `dist/`: modules are transformed on request and
+`index.html` is served from source.
+
+The control server on :3001 is **optional**. It provides backlight dimming and
+the shutdown/restart buttons. If it doesn't start, the dashboard still comes up
+and trains still work, because Vite proxies `/api` straight to the CTA. Nothing
+in the UI path depends on it.
+
+`HOME_INTERFACE_MODE=prod` switches to serving the built `dist/` from the control
+server (lower memory, faster boot). It falls back to dev mode automatically if
+that isn't serving the UI. Use it only once you've confirmed it works on-device.
+
 **The port is not fixed.** The frontend only uses relative URLs, so the server
 binds 3001 or the next free port after it (up to 3010), and `kiosk-start.sh`
 probes that range for whichever port is actually serving the dashboard. A stale

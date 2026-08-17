@@ -147,6 +147,15 @@ nightly update at 3:30 AM.
 If the panel comes up blank, `./pi-setup/diagnose.sh` reports which launcher is
 wired, whether the control server is answering, and the tail of the kiosk log.
 
+## Runtime on the Pi
+
+The kiosk runs the UI from **Vite's dev server on :5173**, which is what this
+panel ran on before the 1.0 rewrite and the only configuration proven on the
+hardware. The control server on :3001 is optional — it adds backlight dimming and
+the power buttons, and the dashboard works without it (Vite proxies `/api`
+straight to the CTA). `HOME_INTERFACE_MODE=prod` serves the built `dist/`
+instead, falling back to dev mode if that isn't serving.
+
 ## Behaviour on the wall
 
 - **Idle sleep** dims the backlight to zero rather than blanking via DPMS, so the
