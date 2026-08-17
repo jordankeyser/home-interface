@@ -172,12 +172,25 @@ const serveStatic = async (req, res) => {
     return send(res, 403, { error: 'Forbidden' });
   }
 
+  // A request for a concrete file (.js, .css, .woff2, …) must never fall back to
+  // index.html. Returning HTML with a text/html type for a missing .js means
+  // Chromium refuses to execute it and the whole page renders as an unstyled
+  // white screen with no error anywhere — which is exactly what a stale dist/
+  // used to produce.
+  const looksLikeAsset = /\.[a-z0-9]+$/i.test(urlPath);
+
   let filePath = resolved;
   try {
     const stat = await fsp.stat(filePath);
     if (stat.isDirectory()) filePath = path.join(filePath, 'index.html');
   } catch {
-    // SPA fallback.
+    if (looksLikeAsset) {
+      console.error(
+        `[404] missing asset ${urlPath} — dist/ is stale or incomplete. Rebuild: npm run build`
+      );
+      return send(res, 404, { error: 'Not found', path: urlPath, hint: 'npm run build' });
+    }
+    // Genuine SPA route: serve the shell.
     filePath = path.join(DIST, 'index.html');
   }
 

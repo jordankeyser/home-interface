@@ -78,6 +78,57 @@ wait_serving() { # $1 = seconds
     return 1
 }
 
+# --- rebuild if dist/ is stale or broken ------------------------------------
+# `git pull && reboot` must be enough. dist/ is gitignored, so a pull updates the
+# sources and leaves the old build in place; if index.html then references asset
+# filenames that no longer exist, every asset 404s and the panel renders blank.
+needs_rebuild() {
+    [[ -f "$APP_DIR/dist/index.html" ]] || {
+        log "dist/index.html missing"
+        return 0
+    }
+
+    # Any source newer than the build means the build is stale.
+    local newer
+    newer=$(find "$APP_DIR/src" "$APP_DIR/public" "$APP_DIR/index.html" \
+        "$APP_DIR/package.json" "$APP_DIR/vite.config.js" \
+        -newer "$APP_DIR/dist/index.html" -print -quit 2>/dev/null)
+    if [[ -n "$newer" ]]; then
+        log "dist/ is older than $newer"
+        return 0
+    fi
+
+    # And verify the assets index.html points at are actually on disk.
+    local ref missing=0
+    while read -r ref; do
+        [[ -n "$ref" ]] || continue
+        [[ -f "$APP_DIR/dist/$ref" ]] || {
+            log "dist/index.html references missing asset: $ref"
+            missing=1
+        }
+    done < <(grep -oE '(src|href)="/[^"]+\.(js|css)"' "$APP_DIR/dist/index.html" 2>/dev/null |
+        sed -E 's/.*"\/(.*)"/\1/')
+    ((missing)) && return 0
+
+    return 1
+}
+
+rebuild() {
+    log "rebuilding dist/ (this takes ~10s)"
+    if (cd "$APP_DIR" && npm run build) >>"$LOG_DIR/build.log" 2>&1; then
+        log "build ok"
+        return 0
+    fi
+    log "BUILD FAILED — see $LOG_DIR/build.log (keeping the previous dist/)"
+    return 1
+}
+
+if needs_rebuild; then
+    rebuild || true
+else
+    log "dist/ is current"
+fi
+
 # --- 1..2: make sure the control server is up -------------------------------
 ensure_server() {
     local found
@@ -117,11 +168,6 @@ ensure_server() {
     if pgrep -f "$APP_DIR/server/index.js" >/dev/null 2>&1; then
         log "a control server process is already running; waiting for it"
     else
-        if [[ ! -f "$APP_DIR/dist/index.html" ]]; then
-            log "dist/ is missing — building now (first run after an update?)"
-            (cd "$APP_DIR" && npm run build) >>"$LOG_DIR/build.log" 2>&1 ||
-                log "  build failed, see $LOG_DIR/build.log"
-        fi
         log "starting the control server directly: $NODE_BIN server/index.js"
         (cd "$APP_DIR" && exec "$NODE_BIN" "$APP_DIR/server/index.js") \
             >>"$LOG_DIR/server.log" 2>&1 &

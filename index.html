@@ -12,9 +12,63 @@
     <meta name="theme-color" content="#06080d" />
     <meta name="description" content="Touch dashboard for a wall-mounted Raspberry Pi panel." />
     <title>Home Interface</title>
+    <!--
+      Inline so the panel is never blank white, even if the stylesheet or the JS
+      bundle fails to load. A wall display showing an unexplained white screen is
+      the worst failure mode there is: it looks identical to a hardware fault and
+      says nothing about the cause.
+    -->
+    <style>
+      html, body { height: 100%; margin: 0; background: #06080d; color: #f3f6fa; }
+      #boot {
+        position: fixed; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 0.75rem;
+        font: 16px/1.5 ui-sans-serif, system-ui, sans-serif; text-align: center;
+        padding: 2rem;
+      }
+      #boot b { font-size: 1.25rem; font-weight: 600; }
+      #boot span { color: #93a1b5; max-width: 30rem; }
+      #boot code {
+        background: #ffffff14; padding: 0.2em 0.45em; border-radius: 0.3em;
+        color: #35b6ff; font-size: 0.9em;
+      }
+      #boot .spin {
+        width: 1.75rem; height: 1.75rem; border-radius: 50%;
+        border: 2px solid #ffffff24; border-top-color: #35b6ff;
+        animation: boot-spin 0.9s linear infinite;
+      }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Replaced by React on mount. If this is still visible after a few
+           seconds, the JS bundle did not run — the text says what to check. -->
+      <div id="boot">
+        <div class="spin"></div>
+        <b>Home Interface</b>
+        <span id="boot-msg">Starting…</span>
+      </div>
+    </div>
+    <script>
+      // If React hasn't taken over after 8s, the bundle failed to load or threw.
+      // Say so on screen rather than sitting on a blank panel.
+      setTimeout(function () {
+        var msg = document.getElementById('boot-msg');
+        if (!msg) return; // React replaced the shell — all good.
+        msg.innerHTML =
+          'The app bundle did not load.<br>Rebuild with ' +
+          '<code>npm run build</code>, then refresh.<br>' +
+          'Details: <code>~/.local/state/home-interface/server.log</code>';
+        var s = document.querySelector('#boot .spin');
+        if (s) s.style.display = 'none';
+      }, 8000);
+
+      window.addEventListener('error', function (e) {
+        var msg = document.getElementById('boot-msg');
+        if (msg) msg.textContent = 'Startup error: ' + (e.message || 'unknown');
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
