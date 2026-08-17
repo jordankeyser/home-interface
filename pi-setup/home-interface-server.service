@@ -11,7 +11,7 @@ WorkingDirectory=__APP_DIR__
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
 Environment=PORT=3001
-ExecStart=/usr/bin/node __APP_DIR__/server/index.js
+ExecStart=__NODE__ __APP_DIR__/server/index.js
 Restart=always
 RestartSec=5
 

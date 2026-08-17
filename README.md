@@ -68,7 +68,7 @@ src/
   context/         Settings and display providers
   hooks/           useSettings, useDisplay, useWeather, useCTA, useOnline
   lib/             fetchJson, displayApi, stockProviders, weatherCodes
-pi-setup/          Kiosk install, systemd units, update script
+pi-setup/          Kiosk install, server unit, update and diagnostic scripts
 ```
 
 The control server does three jobs in one process, so the Pi runs one service:
@@ -138,9 +138,14 @@ cd home-interface
 sudo reboot
 ```
 
-The installer detects the current user and repo path, builds the app, installs
-both systemd units, grants backlight access via udev, adds a NOPASSWD sudoers
-drop-in for shutdown/reboot, and schedules a nightly update at 3:30 AM.
+The installer detects the current user, repo path and graphical session type,
+builds the app, installs the control-server systemd unit, wires the kiosk into
+whatever session mechanism the image actually uses, grants backlight access via
+udev, adds a NOPASSWD sudoers drop-in for shutdown/reboot, and schedules a
+nightly update at 3:30 AM.
+
+If the panel comes up blank, `./pi-setup/diagnose.sh` reports which launcher is
+wired, whether the control server is answering, and the tail of the kiosk log.
 
 ## Behaviour on the wall
 
@@ -166,9 +171,11 @@ effect.
 **Shutdown/restart does nothing.** The sudoers drop-in is missing or invalid:
 `sudo visudo -cf /etc/sudoers.d/home-interface`.
 
-**Blank screen after boot.** `journalctl -u home-interface-server -n 50`, then
-`journalctl -u home-interface-kiosk -n 50`. The kiosk waits for
-`/healthz` and exits with a clear message if the server never comes up.
+**Blank screen after boot.** Run `./pi-setup/diagnose.sh` — it reports which
+launcher is wired, whether the control server answers, and the tail of
+`~/.local/state/home-interface/kiosk.log`. If that log doesn't exist, the
+session never ran the kiosk script; re-run the installer with an explicit
+`LAUNCHER=` (see [pi-setup/README.md](pi-setup/README.md)).
 
 **Updates aren't landing.** `tail -f logs/update.log`. A dirty working tree
 blocks updates by design; run `./pi-setup/daily-update.sh --force` to discard

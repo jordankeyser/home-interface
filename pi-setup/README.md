@@ -9,7 +9,8 @@ Everything needed to run Home Interface as a wall-mounted kiosk.
 ## Requirements
 
 - Raspberry Pi 3, 4 or 5
-- Raspberry Pi OS (Bookworm or later, with desktop)
+- Raspberry Pi OS (Bookworm or later). Lite works — the installer detects that
+  there's no desktop and starts X from a tty1 login instead
 - A display — the DSI/HDMI touchscreens with a `/sys/class/backlight` entry get
   real brightness control; others fall back to on/off
 - Network connection
@@ -38,38 +39,65 @@ Configure API keys from the gear icon on the panel itself.
 
 | Step | Detail |
 | --- | --- |
-| Packages | Chromium, `unclutter`, `x11-xserver-utils`, `xserver-xorg`, `xinit`, git, curl |
+| Packages | Chromium, git, curl — plus `xserver-xorg`, `xinit`, `x11-xserver-utils`, `unclutter` on X11 setups |
 | Node.js | Installs 20.x if missing or older |
 | Build | `npm install && npm run build` |
 | Backlight | udev rule granting the `video` group write access to `brightness`, and adds you to `video` |
-| Power | `/etc/sudoers.d/home-interface` — NOPASSWD for `shutdown`, `reboot`, and restarting the two units |
-| Services | Installs and enables `home-interface-server` and `home-interface-kiosk` |
+| Power | `/etc/sudoers.d/home-interface` — NOPASSWD for `shutdown`, `reboot`, and restarting the server unit |
+| Service | Installs and enables `home-interface-server`, then verifies it answers |
+| Startup | Detects the session type and wires the kiosk into it (see below) |
 | Updates | Cron entry at 3:30 AM running `daily-update.sh` |
-| Boot | Desktop autologin via `raspi-config`, quiet boot via `cmdline.txt` |
-| Cleanup | Moves aside a legacy `~/.xinitrc` that would double-launch the kiosk |
+| Boot | Quiet boot via `cmdline.txt` |
+| Cleanup | Removes the obsolete kiosk systemd unit if present |
 
-## Services
+## How it starts
 
-Two units, in dependency order:
+Two independent pieces.
 
-**`home-interface-server.service`** — the Node control server. Serves the built
-app from `dist/`, proxies the CTA API, and controls the backlight and host power.
-Listens on `127.0.0.1:3001` only. Runs at `multi-user.target`, so display control
-works even before X is up.
-
-**`home-interface-kiosk.service`** — Chromium in kiosk mode. Waits for the
-server's `/healthz` to answer before launching, and restarts on crash.
+**The control server** is a systemd unit, `home-interface-server.service`. It
+serves the built app from `dist/`, proxies the CTA API, and controls the
+backlight and host power. It listens on `127.0.0.1:3001` only and runs at
+`multi-user.target`, so display control works even before X is up.
 
 ```bash
 systemctl status home-interface-server
-systemctl status home-interface-kiosk
-
 sudo systemctl restart home-interface-server
-sudo systemctl restart home-interface-kiosk
-
 journalctl -u home-interface-server -f
-journalctl -u home-interface-kiosk -f
 ```
+
+**The kiosk** is launched by the graphical session, *not* by systemd. A systemd
+unit bound to `graphical.target` cannot reach a user session and never fires at
+all on an image with no desktop — which is what broke startup once before. The
+installer detects the session type and wires the launcher accordingly:
+
+| Detected | Mechanism |
+| --- | --- |
+| `xinit` (no desktop / Lite) | tty1 autologin, `startx` in `~/.bash_profile`, `~/.xinitrc` execs `kiosk-start.sh` |
+| `labwc` (Bookworm Wayland) | `~/.config/labwc/autostart` |
+| `wayfire` | `[autostart]` in `~/.config/wayfire.ini` |
+| `lxde` (X11 desktop) | `~/.config/lxsession/LXDE-pi/autostart` |
+
+Force one if the detection guesses wrong:
+
+```bash
+LAUNCHER=xinit ./pi-setup/install.sh
+```
+
+`kiosk-start.sh` handles both X11 and Wayland — it picks Chromium's
+`--ozone-platform` from the session and only calls `xset` under X11. It logs to
+`~/.local/state/home-interface/kiosk.log`.
+
+## If the panel is blank
+
+Run the diagnostic and read the top of its output — it reports which launcher is
+wired, whether the server is answering, whether `dist/` exists, and the tail of
+the kiosk log.
+
+```bash
+./pi-setup/diagnose.sh
+```
+
+It changes nothing.
 
 ## Health check
 
@@ -93,8 +121,13 @@ curl -s localhost:3001/healthz
 ## Updates
 
 `daily-update.sh` runs nightly at 3:30 AM: fetches, fast-forwards, installs
-dependencies, rebuilds, and restarts both services. If the build fails it rolls
-back to the previous commit so the panel keeps working.
+dependencies, rebuilds, restarts the control server, then reboots so Chromium
+loads the new build. If the build fails it rolls back to the previous commit so
+the panel keeps working, and does not reboot.
+
+Cron has no graphical session, so it cannot reload Chromium in place — hence the
+reboot. Set `REBOOT_AFTER_UPDATE=0` to skip it and pick changes up on the next
+boot instead.
 
 ```bash
 ./pi-setup/daily-update.sh            # run now
@@ -127,23 +160,29 @@ down through the evening, low overnight. Toggle it in Settings.
 
 ## Exiting the kiosk
 
-Plug in a keyboard and press `Alt+F4`, or from SSH:
+Plug in a keyboard and press `Alt+F4`. From SSH, kill Chromium — the session
+launcher started it, so there's no unit to stop:
 
 ```bash
-sudo systemctl stop home-interface-kiosk
+pkill -f 'chromium.*home-interface'
 ```
+
+To stop it coming back on the next boot, remove the launcher hook for your
+session (`~/.xinitrc`, `~/.config/labwc/autostart`, etc.).
 
 ## Troubleshooting
 
-**Black screen after boot.** Check the server first, then the kiosk:
+**Black screen after boot.** Run `./pi-setup/diagnose.sh` first. Then:
 
 ```bash
 journalctl -u home-interface-server -n 50
-journalctl -u home-interface-kiosk -n 50
+tail -30 ~/.local/state/home-interface/kiosk.log
 ```
 
-The kiosk script waits up to 90 seconds for `/healthz` and exits with an
-explicit error rather than hanging.
+If the kiosk log is missing entirely, the session never ran `kiosk-start.sh` —
+the launcher is wired to the wrong mechanism. Re-run the installer with an
+explicit `LAUNCHER=` (see the table above). If the log shows it timing out
+waiting for `/healthz`, the control server is the problem, not the kiosk.
 
 **Brightness doesn't change.** If `/healthz` lists a backlight path, your `video`
 group membership hasn't taken effect — log out and back in, or reboot. Verify by
@@ -180,11 +219,12 @@ curl "localhost:3001/api/1.0/ttarrivals.aspx?key=YOUR_KEY&mapid=40380&outputType
 ## Uninstall
 
 ```bash
-sudo systemctl disable --now home-interface-kiosk home-interface-server
-sudo rm /etc/systemd/system/home-interface-{kiosk,server}.service
+sudo systemctl disable --now home-interface-server
+sudo rm -f /etc/systemd/system/home-interface-server.service
 sudo rm -f /etc/sudoers.d/home-interface /etc/udev/rules.d/90-backlight.rules
 sudo systemctl daemon-reload
 crontab -l | grep -v daily-update.sh | crontab -
+rm -f ~/.xinitrc
 ```
 
 ## Files
@@ -192,7 +232,7 @@ crontab -l | grep -v daily-update.sh | crontab -
 | File | Purpose |
 | --- | --- |
 | `install.sh` | One-time setup |
-| `kiosk-start.sh` | Waits for the server, then launches Chromium |
-| `daily-update.sh` | Nightly pull, rebuild, restart, rollback on failure |
-| `home-interface-server.service` | Control server unit (`__USER__`/`__APP_DIR__` templated) |
-| `home-interface-kiosk.service` | Chromium unit (`__USER__`/`__APP_DIR__` templated) |
+| `kiosk-start.sh` | Waits for the server, then launches Chromium (X11 or Wayland) |
+| `daily-update.sh` | Nightly pull, rebuild, restart, reboot; rolls back on build failure |
+| `diagnose.sh` | Read-only state dump for when the panel is blank |
+| `home-interface-server.service` | Control server unit (`__USER__`/`__APP_DIR__`/`__NODE__` templated) |

@@ -64,8 +64,18 @@ if ! npm run build; then
     exit 1
 fi
 
-log "Restarting services..."
+log "Restarting the control server..."
 sudo -n systemctl restart home-interface-server.service || log "WARNING: server restart failed"
-sudo -n systemctl restart home-interface-kiosk.service || log "WARNING: kiosk restart failed"
+
+# Chromium is launched by the desktop session, not systemd, so cron (which has
+# no session or DISPLAY) can't restart or reload it. Rebooting is the reliable
+# way to pick up the new build — and at 3:30 AM nobody is looking at the panel.
+# Set REBOOT_AFTER_UPDATE=0 to skip it and pick changes up on the next boot.
+if [[ "${REBOOT_AFTER_UPDATE:-1}" == "1" ]]; then
+    log "Update applied; rebooting to load the new build."
+    sudo -n /sbin/reboot || log "WARNING: reboot failed (check /etc/sudoers.d/home-interface)"
+else
+    log "REBOOT_AFTER_UPDATE=0 — new build loads on next boot."
+fi
 
 log "Update complete at $(git rev-parse --short HEAD)."
