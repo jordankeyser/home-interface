@@ -1,371 +1,148 @@
-#!/usr/bin/env bash
-#
-# One-time Raspberry Pi kiosk setup for Home Interface.
-#
-# Two independent pieces:
-#   * home-interface-server.service — systemd, runs at multi-user.target, needs
-#     no display. Serves the build, proxies the CTA API, drives the backlight.
-#   * the kiosk itself — launched by whatever session mechanism this image
-#     actually uses. Detected below rather than assumed; a kiosk systemd unit
-#     bound to graphical.target cannot reach a user session and never fires on
-#     a console/Lite image.
-set -euo pipefail
-
-KIOSK_USER="${KIOSK_USER:-$(id -un)}"
-APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-NODE_MAJOR="${NODE_MAJOR:-20}"
-
-if [[ "$KIOSK_USER" == "root" ]]; then
-    echo "ERROR: run as your normal login user, not root (it sudos as needed)."
-    exit 1
-fi
-
-step() { echo ""; echo "--- $* ---"; }
-
-# --- detect how this image starts a graphical session ----------------------
-detect_launcher() {
-    if command -v labwc >/dev/null 2>&1 && [[ -d "$HOME/.config/labwc" ]]; then
-        echo labwc
-    elif command -v wayfire >/dev/null 2>&1; then
-        echo wayfire
-    elif command -v startlxde-pi >/dev/null 2>&1 || [[ -d "$HOME/.config/lxsession" ]]; then
-        echo lxde
-    elif command -v labwc >/dev/null 2>&1; then
-        echo labwc
-    else
-        # No desktop session: X started from a tty1 login. This is what the
-        # original setup used and what a Lite image gives you.
-        echo xinit
-    fi
-}
-
-LAUNCHER="${LAUNCHER:-$(detect_launcher)}"
-
-echo "========================================="
-echo " Home Interface kiosk setup"
-echo "========================================="
-echo "  user:     $KIOSK_USER"
-echo "  app dir:  $APP_DIR"
-echo "  launcher: $LAUNCHER"
-echo ""
-echo "  (override with LAUNCHER=xinit|labwc|wayfire|lxde ./pi-setup/install.sh)"
-echo ""
-read -r -p "Continue? [y/N] " reply
-[[ "$reply" =~ ^[Yy]$ ]] || exit 1
-
-step "Installing system packages"
-sudo apt-get update
-if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate: [0-9]"; then
-    CHROMIUM_PKG=chromium-browser
-else
-    CHROMIUM_PKG=chromium
-fi
-PACKAGES=("$CHROMIUM_PKG" git curl)
-if [[ "$LAUNCHER" == "xinit" || "$LAUNCHER" == "lxde" ]]; then
-    PACKAGES+=(xserver-xorg xinit x11-xserver-utils unclutter)
-fi
-sudo apt-get install -y "${PACKAGES[@]}"
-
-step "Checking Node.js"
-if ! command -v node >/dev/null 2>&1 ||
-    [[ "$(node -p 'process.versions.node.split(".")[0]')" -lt "$NODE_MAJOR" ]]; then
-    echo "Installing Node.js ${NODE_MAJOR}.x ..."
-    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | sudo -E bash -
-    sudo apt-get install -y nodejs
-fi
-NODE_BIN="$(command -v node)"
-echo "node $(node --version) at $NODE_BIN"
-
-step "Installing app dependencies and building"
-cd "$APP_DIR"
-npm install
-npm run build
-mkdir -p "$APP_DIR/logs"
-chmod +x "$APP_DIR"/pi-setup/*.sh
-
-step "Granting backlight access (udev)"
-# Lets the control server set brightness with a plain file write instead of
-# shelling out to `echo … | sudo tee …`.
-sudo tee /etc/udev/rules.d/90-backlight.rules >/dev/null <<'EOF'
-# Allow the video group to control panel brightness.
-SUBSYSTEM=="backlight", ACTION=="add", \
-  RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", \
-  RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
-EOF
-sudo usermod -aG video "$KIOSK_USER"
-sudo udevadm control --reload-rules
-sudo udevadm trigger --subsystem-match=backlight || true
-
-# Apply to any already-present backlight so a reboot isn't required.
-for bl in /sys/class/backlight/*/brightness; do
-    [[ -e "$bl" ]] || continue
-    sudo chgrp video "$bl" && sudo chmod g+w "$bl"
-    echo "  backlight: $bl"
-done
-
-step "Allowing shutdown/reboot without a password"
-sudo tee /etc/sudoers.d/home-interface >/dev/null <<EOF
-# Home Interface: power controls and service restart from the dashboard.
-$KIOSK_USER ALL=(root) NOPASSWD: /sbin/shutdown, /sbin/reboot
-$KIOSK_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart home-interface-server.service
-EOF
-sudo chmod 0440 /etc/sudoers.d/home-interface
-sudo visudo -cf /etc/sudoers.d/home-interface
-
-step "Checking port 3001"
-# Stop our own service first, so a healthy existing install doesn't look like a
-# foreign process squatting on the port when this script is re-run.
-sudo systemctl stop home-interface-server.service 2>/dev/null || true
-
-# The pre-1.0 server/displayServer.js also bound 3001. None of these scripts
-# ever started it, so if it is running it was wired up by hand — and it will
-# still be holding the port at boot, which makes the new unit crash-loop on
-# EADDRINUSE forever. Note it keeps running even though the file is now deleted.
-if pgrep -f 'displayServer\.js' >/dev/null 2>&1; then
-    echo "  stopping a legacy displayServer.js process:"
-    pgrep -af 'displayServer\.js' | sed 's/^/    /'
-    pkill -f 'displayServer\.js' || true
-    sleep 1
-fi
-
-# Remove anything that would start it again on the next boot.
-for f in "$HOME/.config/labwc/autostart" \
-    "$HOME/.config/lxsession/LXDE-pi/autostart" \
-    "$HOME/.config/wayfire.ini" \
-    "$HOME/.xinitrc" \
-    "$HOME/.bash_profile"; do
-    if [[ -f "$f" ]] && grep -q 'displayServer' "$f" 2>/dev/null; then
-        grep -v 'displayServer' "$f" >"$f.tmp" && mv "$f.tmp" "$f"
-        echo "  removed displayServer from $f"
-    fi
-done
-
-if crontab -l 2>/dev/null | grep -q displayServer; then
-    crontab -l 2>/dev/null | grep -v displayServer | crontab -
-    echo "  removed displayServer from crontab"
-fi
-
-for unit in /etc/systemd/system/*display*.service /etc/systemd/system/*home-interface-display*.service; do
-    [[ -e "$unit" ]] || continue
-    case "$unit" in */display-manager.service) continue ;; esac
-    if grep -q 'displayServer' "$unit" 2>/dev/null; then
-        name=$(basename "$unit")
-        echo "  disabling legacy unit $name"
-        sudo systemctl disable --now "$name" 2>/dev/null || true
-        sudo rm -f "$unit"
-        sudo systemctl daemon-reload
-    fi
-done
-
-# Warn but keep going if something foreign still holds the port. kiosk-start.sh
-# clears stale listeners and can run the server itself, so the panel still comes
-# up — aborting the install here would leave the Pi worse off, not better.
-if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -qE '127\.0\.0\.1:3001|0\.0\.0\.0:3001|\*:3001'; then
-    echo ""
-    echo "  WARNING: something is still listening on port 3001:"
-    sudo ss -ltnp 2>/dev/null | grep ':3001' | sed 's/^/    /'
-    echo "  Continuing — kiosk-start.sh will try to clear it at boot."
-else
-    echo "  port 3001 is free"
-fi
-
-step "Installing the control server service"
-sed -e "s|__USER__|$KIOSK_USER|g" \
-    -e "s|__APP_DIR__|$APP_DIR|g" \
-    -e "s|__NODE__|$NODE_BIN|g" \
-    "$APP_DIR/pi-setup/home-interface-server.service" |
-    sudo tee /etc/systemd/system/home-interface-server.service >/dev/null
-sudo systemctl daemon-reload
-sudo systemctl enable home-interface-server.service
-sudo systemctl restart home-interface-server.service
-
-# Give it a moment, then confirm — a silent failure here is what made display
-# control appear to "do nothing" in the previous setup.
-sleep 2
-if curl -fsS --max-time 3 http://127.0.0.1:3001/healthz >/dev/null 2>&1; then
-    echo "  control server responding on 127.0.0.1:3001"
-else
-    echo "  WARNING: control server did not respond. Check:"
-    echo "    journalctl -u home-interface-server -n 40"
-fi
-
-# A kiosk unit bound to graphical.target was installed by earlier versions of
-# this script. It cannot reach a user session, so remove it rather than leave it
-# restart-looping.
-if [[ -e /etc/systemd/system/home-interface-kiosk.service ]]; then
-    step "Removing the obsolete kiosk systemd unit"
-    sudo systemctl disable --now home-interface-kiosk.service 2>/dev/null || true
-    sudo rm -f /etc/systemd/system/home-interface-kiosk.service
-    sudo systemctl daemon-reload
-    echo "  removed (the session launcher below owns startup now)"
-fi
-
-step "Wiring kiosk startup ($LAUNCHER)"
-KIOSK_CMD="$APP_DIR/pi-setup/kiosk-start.sh"
-
-# Remove every launcher hook first, then add back only the chosen one. Leaving
-# stale hooks in place starts several Chromium instances against different
-# displays at once — a console X server on :0 racing the desktop session on :1.
-clear_launcher_hooks() {
-    rm -f "$HOME/.xinitrc" "$HOME/.xinitrc.home-interface.bak"
-
-    # Neuter any startx-on-login block without breaking the enclosing if/fi
-    # (an emptied if body is a shell syntax error, which would break login).
-    if [[ -f "$HOME/.bash_profile" ]] && grep -q startx "$HOME/.bash_profile" 2>/dev/null; then
-        sed -i 's|^\([[:space:]]*\)\(exec[[:space:]]\+\)\?startx.*|\1true  # startx disabled by home-interface installer|' \
-            "$HOME/.bash_profile"
-    fi
-
-    for f in "$HOME/.config/labwc/autostart" \
-        "$HOME/.config/lxsession/LXDE-pi/autostart"; do
-        [[ -f "$f" ]] || continue
-        grep -v 'kiosk-start.sh' "$f" >"$f.tmp" 2>/dev/null || true
-        mv "$f.tmp" "$f"
-    done
-
-    [[ -f "$HOME/.config/wayfire.ini" ]] &&
-        sed -i '/home_interface/d' "$HOME/.config/wayfire.ini"
-
-    # tty1 autologin belongs to the console path only; a display manager does
-    # its own autologin and the two fight over the console.
-    if [[ "$LAUNCHER" != "xinit" ]] &&
-        [[ -e /etc/systemd/system/display-manager.service ]] &&
-        [[ -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]]; then
-        sudo rm -f /etc/systemd/system/getty@tty1.service.d/autologin.conf
-        sudo systemctl daemon-reload
-        echo "  removed tty1 autologin (lightdm handles login on this image)"
-    fi
-
-    return 0
-}
-
-clear_launcher_hooks
-echo "  cleared previous launcher hooks"
-
-case "$LAUNCHER" in
-xinit)
-    # tty1 autologin -> .bash_profile runs startx -> .xinitrc execs the kiosk.
-    # This is the mechanism the original install used and what works on an
-    # image with no desktop session.
-    sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
-    sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf >/dev/null <<EOF
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin $KIOSK_USER --noclear %I \$TERM
-EOF
-    sudo systemctl set-default multi-user.target
-    sudo systemctl daemon-reload
-    echo "  tty1 autologin configured"
-
-    # Match our marker, not bare "startx": clear_launcher_hooks leaves a
-    # "startx disabled by ..." comment behind, which a bare grep would match.
-    if ! grep -q "home-interface: autostart X" "$HOME/.bash_profile" 2>/dev/null; then
-        cat >>"$HOME/.bash_profile" <<'EOF'
-
-# home-interface: autostart X on tty1 login
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    exec startx
-fi
-EOF
-        echo "  added startx to ~/.bash_profile"
-    else
-        echo "  ~/.bash_profile already configured"
-    fi
-
-    cat >"$HOME/.xinitrc" <<EOF
 #!/bin/bash
-# home-interface kiosk
-exec $KIOSK_CMD
-EOF
-    chmod +x "$HOME/.xinitrc"
-    echo "  wrote ~/.xinitrc"
-    ;;
+# Installation Script for Home Interface Kiosk on Raspberry Pi
+# Run this script once to set up the kiosk
 
-labwc)
-    mkdir -p "$HOME/.config/labwc"
-    AUTOSTART="$HOME/.config/labwc/autostart"
-    touch "$AUTOSTART"
-    grep -v 'kiosk-start.sh' "$AUTOSTART" >"$AUTOSTART.tmp" || true
-    mv "$AUTOSTART.tmp" "$AUTOSTART"
-    echo "$KIOSK_CMD &" >>"$AUTOSTART"
-    chmod +x "$AUTOSTART"
-    sudo systemctl set-default graphical.target
-    echo "  wrote $AUTOSTART"
-    ;;
+set -e
 
-wayfire)
-    WF="$HOME/.config/wayfire.ini"
-    touch "$WF"
-    if ! grep -q '^\[autostart\]' "$WF"; then printf '\n[autostart]\n' >>"$WF"; fi
-    if ! grep -q 'home_interface' "$WF"; then
-        sed -i "/^\[autostart\]/a home_interface = $KIOSK_CMD" "$WF"
-    fi
-    sudo systemctl set-default graphical.target
-    echo "  wrote $WF"
-    ;;
+echo "========================================="
+echo "Home Interface Kiosk Setup"
+echo "========================================="
+echo ""
 
-lxde)
-    mkdir -p "$HOME/.config/lxsession/LXDE-pi"
-    AUTOSTART="$HOME/.config/lxsession/LXDE-pi/autostart"
-    touch "$AUTOSTART"
-    grep -v 'kiosk-start.sh' "$AUTOSTART" >"$AUTOSTART.tmp" || true
-    mv "$AUTOSTART.tmp" "$AUTOSTART"
-    {
-        echo "@xset s off"
-        echo "@xset -dpms"
-        echo "@xset s noblank"
-        echo "@$KIOSK_CMD"
-    } >>"$AUTOSTART"
-    sudo systemctl set-default graphical.target
-    echo "  wrote $AUTOSTART"
-    ;;
-
-*)
-    echo "  ERROR: unknown launcher '$LAUNCHER'"
+# Check if running as jordankeyser user
+if [ "$USER" != "jordankeyser" ]; then
+    echo "ERROR: This script must be run as the 'jordankeyser' user"
     exit 1
-    ;;
-esac
-
-step "Scheduling daily updates (3:30 AM)"
-CRON_LINE="30 3 * * * $APP_DIR/pi-setup/daily-update.sh"
-(
-    crontab -l 2>/dev/null | grep -v 'daily-update.sh'
-    echo "$CRON_LINE"
-) | crontab -
-
-step "Quieting the boot messages"
-# Bookworm moved this file; the pre-Bookworm path silently no-ops on current OS.
-CMDLINE=/boot/firmware/cmdline.txt
-[[ -f "$CMDLINE" ]] || CMDLINE=/boot/cmdline.txt
-if [[ -f "$CMDLINE" ]]; then
-    if ! grep -q "logo.nologo" "$CMDLINE"; then
-        sudo sed -i '1 s/$/ quiet loglevel=3 logo.nologo vt.global_cursor_default=0/' "$CMDLINE"
-        echo "  updated $CMDLINE"
-    else
-        echo "  already configured"
-    fi
-else
-    echo "  WARNING: no cmdline.txt found; skipping"
 fi
+
+# Update system
+echo "Step 1: Updating system packages..."
+sudo apt update
+sudo apt upgrade -y
+
+# Install required packages
+echo "Step 2: Installing required packages..."
+
+# Determine which Chromium package is available
+if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate:.*[0-9]"; then
+    CHROMIUM_PKG="chromium-browser"
+elif apt-cache policy chromium 2>/dev/null | grep -q "Candidate:.*[0-9]"; then
+    CHROMIUM_PKG="chromium"
+else
+    echo "ERROR: Neither chromium-browser nor chromium package found"
+    echo "Trying to install chromium anyway..."
+    CHROMIUM_PKG="chromium"
+fi
+
+echo "Installing Chromium package: $CHROMIUM_PKG"
+
+sudo apt install -y \
+    $CHROMIUM_PKG \
+    unclutter \
+    xdotool \
+    x11-xserver-utils \
+    git \
+    curl
+
+# Install Node.js if not already installed
+if ! command -v node &> /dev/null; then
+    echo "Step 3: Installing Node.js..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+else
+    echo "Step 3: Node.js already installed ($(node --version))"
+fi
+
+# Verify repository exists
+if [ ! -d "/home/jordankeyser/Desktop/home-interface" ]; then
+    echo "ERROR: Repository not found at /home/jordankeyser/Desktop/home-interface"
+    echo "Please clone the repository first:"
+    echo "  cd /home/jordankeyser/Desktop"
+    echo "  git clone <your-repo-url> home-interface"
+    exit 1
+fi
+
+cd /home/jordankeyser/Desktop/home-interface
+
+# Install npm dependencies
+echo "Step 4: Installing npm dependencies..."
+npm install
+
+# Create logs directory
+echo "Step 5: Creating logs directory..."
+mkdir -p /home/jordankeyser/Desktop/home-interface/logs
+
+# Make scripts executable
+echo "Step 6: Making scripts executable..."
+chmod +x /home/jordankeyser/Desktop/home-interface/pi-setup/*.sh
+
+# Set up systemd service
+echo "Step 7: Setting up systemd service..."
+sudo cp /home/jordankeyser/Desktop/home-interface/pi-setup/home-interface-kiosk.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable home-interface-kiosk.service
+
+# Set up daily update cron job
+echo "Step 8: Setting up daily update cron job..."
+CRON_JOB="0 3 * * * /home/jordankeyser/Desktop/home-interface/pi-setup/daily-update.sh"
+(crontab -l 2>/dev/null | grep -v "daily-update.sh"; echo "$CRON_JOB") | crontab -
+
+# Configure auto-login (if not already done)
+echo "Step 9: Configuring auto-login..."
+if [ ! -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]; then
+    sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
+    echo "[Service]" | sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+    echo "ExecStart=" | sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+    echo "ExecStart=-/sbin/agetty --autologin jordankeyser --noclear %I \$TERM" | sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+fi
+
+# Configure auto-startx in .bash_profile
+echo "Step 10: Configuring auto-start X server..."
+if ! grep -q "startx" /home/jordankeyser/.bash_profile 2>/dev/null; then
+    cat >> /home/jordankeyser/.bash_profile << 'EOF'
+
+# Auto-start X server on login (tty1 only)
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+    startx
+fi
+EOF
+fi
+
+# Hide boot messages by configuring /boot/cmdline.txt
+echo "Step 11: Configuring boot parameters..."
+if ! grep -q "quiet splash" /boot/cmdline.txt 2>/dev/null; then
+    sudo sed -i '$ s/$/ quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
+fi
+
+# Create .xinitrc to auto-start the kiosk
+echo "Step 12: Creating .xinitrc..."
+cat > /home/jordankeyser/.xinitrc << 'EOF'
+#!/bin/bash
+# Start the kiosk on X server launch
+exec /home/jordankeyser/Desktop/home-interface/pi-setup/kiosk-start.sh
+EOF
+chmod +x /home/jordankeyser/.xinitrc
 
 echo ""
 echo "========================================="
-echo " Done — reboot to start the kiosk"
+echo "Installation Complete!"
 echo "========================================="
-cat <<EOF
+echo ""
+echo "Configuration saved. To start the kiosk:"
+echo "1. Option A: Reboot the Pi: sudo reboot"
+echo "2. Option B: Start manually: startx"
+echo ""
+echo "The kiosk will automatically:"
+echo "- Start on boot"
+echo "- Pull updates daily at 3 AM"
+echo "- Restart if it crashes"
+echo ""
+echo "Useful commands:"
+echo "- View logs: tail -f /home/jordankeyser/Desktop/home-interface/logs/vite.log"
+echo "- View update logs: tail -f /home/jordankeyser/Desktop/home-interface/logs/update.log"
+echo "- Stop kiosk: sudo systemctl stop home-interface-kiosk"
+echo "- Check status: sudo systemctl status home-interface-kiosk"
+echo ""
+echo "To exit the kiosk once running, press: Alt+F4"
+echo ""
 
-  sudo reboot
-
-If the panel comes up blank, run this and paste the output:
-
-  $APP_DIR/pi-setup/diagnose.sh
-
-Useful commands:
-  systemctl status home-interface-server
-  journalctl -u home-interface-server -f
-  curl -s localhost:3001/healthz
-  tail -f \$HOME/.local/state/home-interface/kiosk.log
-
-You were added to the 'video' group; that takes effect after the reboot.
-Configure API keys from the gear icon on the panel.
-EOF

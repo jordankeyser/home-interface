@@ -1,0 +1,18 @@
+[Unit]
+Description=Home Interface Kiosk
+After=network-online.target graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jordankeyser
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/jordankeyser/.Xauthority
+WorkingDirectory=/home/jordankeyser/Desktop/home-interface
+ExecStart=/home/jordankeyser/Desktop/home-interface/pi-setup/kiosk-start.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target
+

@@ -1,287 +1,324 @@
-# Raspberry Pi Kiosk Setup
+# Raspberry Pi Kiosk Setup Guide
 
-Everything needed to run Home Interface as a wall-mounted kiosk.
+This guide will help you set up your Home Interface application as a fullscreen kiosk on a Raspberry Pi with a 7-inch touchscreen.
 
-> Consolidated from the former `README.md` + `SETUP-SUMMARY.md` +
-> `QUICK-REFERENCE.md`, which had drifted out of sync with each other and with
-> the code.
+## 🎯 Features
 
-## Requirements
+- ✅ **Fullscreen kiosk mode** - No browser UI, no desktop visible
+- ✅ **Touch-optimized** - All buttons sized for touch interaction (minimum 48x48px)
+- ✅ **Auto-start on boot** - Application launches automatically when Pi powers on
+- ✅ **Auto-updates** - Pulls latest code from git once daily at 3 AM
+- ✅ **Auto-restart** - Service restarts automatically if it crashes
+- ✅ **Screen management** - Disables screen blanking and sleep
 
-- Raspberry Pi 3, 4 or 5
-- Raspberry Pi OS (Bookworm or later). Lite works — the installer detects that
-  there's no desktop and starts X from a tty1 login instead
-- A display — the DSI/HDMI touchscreens with a `/sys/class/backlight` entry get
-  real brightness control; others fall back to on/off
-- Network connection
+## 📋 Prerequisites
 
-## Install
+- Raspberry Pi (3, 4, or 5 recommended)
+- 7-inch touchscreen display
+- Raspberry Pi OS (with desktop) installed
+- Internet connection
+- This repository cloned to `/home/pi/home-interface`
+
+## 🚀 Quick Installation
+
+### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/jordankeyser/home-interface.git
+cd /home/pi
+git clone <your-repository-url> home-interface
 cd home-interface
+```
+
+### Step 2: Run the Installation Script
+
+```bash
+chmod +x pi-setup/install.sh
 ./pi-setup/install.sh
 ```
 
-Then reboot:
+### Step 3: Configure Settings
+
+Before rebooting, you may want to set up your API keys and settings:
+
+1. Temporarily start the app: `npm start`
+2. Open it in a browser: `http://localhost:5173`
+3. Click the settings gear icon
+4. Enter your:
+   - CTA API Key
+   - Station ID (MapID)
+   - Zip Code
+5. Save settings
+
+Settings are stored in localStorage and will persist.
+
+### Step 4: Reboot
 
 ```bash
 sudo reboot
 ```
 
-Run it as your normal login user, not root — it calls `sudo` where needed. The
-user and install path are detected from where you cloned the repo; nothing is
-hardcoded.
+The kiosk will automatically start!
 
-Configure API keys from the gear icon on the panel itself.
+## 📁 Files Included
 
-## What the installer does
+### `kiosk-start.sh`
+Main startup script that:
+- Waits for network connection
+- Starts the Vite development server
+- Disables screen blanking
+- Hides mouse cursor after 3 seconds of inactivity
+- Launches Chromium in fullscreen kiosk mode
 
-| Step | Detail |
-| --- | --- |
-| Packages | Chromium, git, curl — plus `xserver-xorg`, `xinit`, `x11-xserver-utils`, `unclutter` on X11 setups |
-| Node.js | Installs 20.x if missing or older |
-| Build | `npm install && npm run build` |
-| Backlight | udev rule granting the `video` group write access to `brightness`, and adds you to `video` |
-| Power | `/etc/sudoers.d/home-interface` — NOPASSWD for `shutdown`, `reboot`, and restarting the server unit |
-| Service | Installs and enables `home-interface-server`, then verifies it answers |
-| Startup | Detects the session type and wires the kiosk into it (see below) |
-| Updates | Cron entry at 3:30 AM running `daily-update.sh` |
-| Boot | Quiet boot via `cmdline.txt` |
-| Cleanup | Removes the obsolete kiosk systemd unit if present |
+### `home-interface-kiosk.service`
+Systemd service unit file that:
+- Runs the kiosk automatically on boot
+- Restarts the service if it crashes
+- Manages the kiosk lifecycle
 
-## How it starts
+### `daily-update.sh`
+Automated update script that:
+- Runs daily at 3 AM via cron
+- Pulls latest changes from git
+- Installs any new dependencies
+- Restarts the kiosk service
 
-Two independent pieces.
+### `install.sh`
+One-time installation script that:
+- Installs all required system packages
+- Sets up Node.js
+- Configures auto-login and auto-start
+- Creates systemd service
+- Sets up cron job for daily updates
+- Hides boot messages
 
-**The control server** is a systemd unit, `home-interface-server.service`. It
-serves the built app from `dist/`, proxies the CTA API, and controls the
-backlight and host power. It listens on `127.0.0.1:3001` only and runs at
-`multi-user.target`, so display control works even before X is up.
+## 🎮 Usage
 
-```bash
-systemctl status home-interface-server
-sudo systemctl restart home-interface-server
-journalctl -u home-interface-server -f
-```
-
-## Runtime
-
-The UI is served by **Vite's own dev server on :5173** — the configuration this
-panel ran on for months before the 1.0 rewrite, and the only one proven on this
-hardware. It also can't suffer the stale-build failure that produced a blank
-white screen, because there is no `dist/`: modules are transformed on request and
-`index.html` is served from source.
-
-The control server on :3001 is **optional**. It provides backlight dimming and
-the shutdown/restart buttons. If it doesn't start, the dashboard still comes up
-and trains still work, because Vite proxies `/api` straight to the CTA. Nothing
-in the UI path depends on it.
-
-`HOME_INTERFACE_MODE=prod` switches to serving the built `dist/` from the control
-server (lower memory, faster boot). It falls back to dev mode automatically if
-that isn't serving the UI. Use it only once you've confirmed it works on-device.
-
-**The port is not fixed.** The frontend only uses relative URLs, so the server
-binds 3001 or the next free port after it (up to 3010), and `kiosk-start.sh`
-probes that range for whichever port is actually serving the dashboard. A stale
-listener on 3001 therefore can't break the panel — it just moves over. Set
-`STRICT_PORT=1` to require the exact port and fail loudly instead.
-
-`/healthz` returns 503 unless there is a real build to serve, so the kiosk never
-points Chromium at a server that can only answer 404s. If there is genuinely no
-build, the page explains that instead of showing a bare "Not found".
-
-**`kiosk-start.sh` owns the whole stack and is the thing that must not fail.**
-It clears any stale listener on port 3001, makes sure the control server is
-running — asking systemd first, then starting it directly if systemd hasn't or
-can't — launches Chromium whether or not the server came up, and relaunches
-Chromium if it ever exits. The panel is designed to appear on boot even when
-something else is broken; an earlier version only waited on the systemd unit and
-gave up, so one bad unit file meant nothing but the desktop.
-
-**The kiosk** is launched by the graphical session, *not* by systemd. A systemd
-unit bound to `graphical.target` cannot reach a user session and never fires at
-all on an image with no desktop — which is what broke startup once before. The
-installer detects the session type and wires the launcher accordingly:
-
-| Detected | Mechanism |
-| --- | --- |
-| `xinit` (no desktop / Lite) | tty1 autologin, `startx` in `~/.bash_profile`, `~/.xinitrc` execs `kiosk-start.sh` |
-| `labwc` (Bookworm Wayland) | `~/.config/labwc/autostart` |
-| `wayfire` | `[autostart]` in `~/.config/wayfire.ini` |
-| `lxde` (X11 desktop) | `~/.config/lxsession/LXDE-pi/autostart` |
-
-Force one if the detection guesses wrong:
+### Starting/Stopping the Kiosk
 
 ```bash
-LAUNCHER=xinit ./pi-setup/install.sh
+# Check status
+sudo systemctl status home-interface-kiosk
+
+# Start manually
+sudo systemctl start home-interface-kiosk
+
+# Stop
+sudo systemctl stop home-interface-kiosk
+
+# Restart
+sudo systemctl restart home-interface-kiosk
+
+# Disable auto-start
+sudo systemctl disable home-interface-kiosk
+
+# Re-enable auto-start
+sudo systemctl enable home-interface-kiosk
 ```
 
-`kiosk-start.sh` handles both X11 and Wayland — it picks Chromium's
-`--ozone-platform` from the session and only calls `xset` under X11. It logs to
-`~/.local/state/home-interface/kiosk.log`.
-
-## If the panel is blank
-
-Run the diagnostic and read the top of its output — it reports which launcher is
-wired, whether the server is answering, whether `dist/` exists, and the tail of
-the kiosk log.
+### Viewing Logs
 
 ```bash
-./pi-setup/diagnose.sh
+# Vite server logs
+tail -f /home/pi/home-interface/logs/vite.log
+
+# Update logs
+tail -f /home/pi/home-interface/logs/update.log
+
+# System service logs
+journalctl -u home-interface-kiosk -f
 ```
 
-It changes nothing.
+### Exiting the Kiosk
 
-## Health check
+When the kiosk is running, you can exit by:
+- Pressing **Alt+F4**
+- Connecting via SSH and running: `sudo systemctl stop home-interface-kiosk`
+
+### Manual Updates
+
+To manually update the application:
 
 ```bash
-curl -s localhost:3001/healthz
+cd /home/pi/home-interface
+git pull origin main
+npm install
+sudo systemctl restart home-interface-kiosk
 ```
 
-```json
-{
-  "ok": true,
-  "backlight": "/sys/class/backlight/10-0045/brightness",
-  "powerEnabled": true,
-  "servingDist": true
-}
-```
+## 🔧 Configuration
 
-- `backlight: null` — no sysfs backlight found; falls back to `vcgencmd`, then
-  `xset dpms`. Both are on/off only, and DPMS can disable touch on some panels.
-- `servingDist: false` — the app hasn't been built. Run `npm run build`.
+### Changing the Port
 
-## Updates
+If you need to change from port 5173, edit:
+1. `vite.config.js` - Set custom port
+2. `pi-setup/kiosk-start.sh` - Update the localhost URL in two places
 
-`daily-update.sh` runs nightly at 3:30 AM: fetches, fast-forwards, installs
-dependencies, rebuilds, restarts the control server, then reboots so Chromium
-loads the new build. If the build fails it rolls back to the previous commit so
-the panel keeps working, and does not reboot.
+### Touch Calibration
 
-Cron has no graphical session, so it cannot reload Chromium in place — hence the
-reboot. Set `REBOOT_AFTER_UPDATE=0` to skip it and pick changes up on the next
-boot instead.
+If your touchscreen needs calibration:
 
 ```bash
-./pi-setup/daily-update.sh            # run now
-./pi-setup/daily-update.sh --force    # discard local changes first
-tail -f logs/update.log
+sudo apt install xinput-calibrator
+DISPLAY=:0 xinput_calibrator
 ```
 
-A dirty working tree blocks updates by design — the log says which files are
-dirty. Use `--force` to discard them.
+Follow the on-screen instructions and add the output to your X configuration.
 
-To push a change from your dev machine:
+### Screen Rotation
+
+To rotate the screen, add to `/boot/config.txt`:
 
 ```bash
-git push origin main
+# For 90-degree rotation
+display_rotate=1
+
+# For 180-degree rotation
+display_rotate=2
+
+# For 270-degree rotation
+display_rotate=3
 ```
 
-The Pi picks it up at 3:30 AM, or run the script manually.
+Then reboot.
 
-## Display behaviour
+### Brightness Control
 
-Sleep dims the **backlight to zero** rather than using DPMS blanking, which
-keeps the touch digitiser powered so a tap wakes the panel. X screen blanking and
-DPMS are explicitly disabled in `kiosk-start.sh` so they can't fight the app.
-
-The dashboard stays mounted while asleep, so waking is instant with no loading
-flash. Data polling pauses while the panel is dark.
-
-Ambient dimming follows a day/night curve: full brightness 7 AM–7 PM, easing
-down through the evening, low overnight. Toggle it in Settings.
-
-## Exiting the kiosk
-
-Plug in a keyboard and press `Alt+F4`. From SSH, kill Chromium — the session
-launcher started it, so there's no unit to stop:
+Create a script to adjust brightness:
 
 ```bash
-pkill -f 'chromium.*home-interface'
+echo 100 | sudo tee /sys/class/backlight/*/brightness  # Max brightness
+echo 50 | sudo tee /sys/class/backlight/*/brightness   # 50% brightness
 ```
 
-To stop it coming back on the next boot, remove the launcher hook for your
-session (`~/.xinitrc`, `~/.config/labwc/autostart`, etc.).
+## 🐛 Troubleshooting
 
-## Troubleshooting
+### Kiosk won't start
 
-**Black screen after boot.** Run `./pi-setup/diagnose.sh` first. Then:
+1. Check the service status:
+   ```bash
+   sudo systemctl status home-interface-kiosk
+   ```
+
+2. Check logs:
+   ```bash
+   journalctl -u home-interface-kiosk -n 50
+   ```
+
+3. Check if Vite server is running:
+   ```bash
+   curl http://localhost:5173
+   ```
+
+### Black screen after boot
+
+- The app might still be loading. Wait 30 seconds.
+- Check if X server started: `ps aux | grep X`
+- Try restarting: `sudo systemctl restart home-interface-kiosk`
+
+### Touch not working
+
+- Verify touch input: `xinput list`
+- Test touch: `xinput test <device-id>`
+- Reboot if needed
+
+### Updates not working
+
+- Check cron is running: `systemctl status cron`
+- View update logs: `cat /home/pi/home-interface/logs/update.log`
+- Test manual update: `./pi-setup/daily-update.sh`
+
+### Network connection issues
+
+- Ensure Pi has internet: `ping -c 3 google.com`
+- The kiosk waits for network before starting
+- Check network logs: `journalctl -u NetworkManager`
+
+## 🔐 Security Notes
+
+### SSH Access
+
+Keep SSH enabled for remote management:
 
 ```bash
-journalctl -u home-interface-server -n 50
-tail -30 ~/.local/state/home-interface/kiosk.log
+sudo systemctl enable ssh
+sudo systemctl start ssh
 ```
 
-If the kiosk log is missing entirely, the session never ran `kiosk-start.sh` —
-the launcher is wired to the wrong mechanism. Re-run the installer with an
-explicit `LAUNCHER=` (see the table above). If the log shows it timing out
-waiting for `/healthz`, the control server is the problem, not the kiosk.
+### Firewall
 
-**The panel shows the desktop, and the server keeps restarting.** Something else
-is holding port 3001, so the unit crash-loops on `EADDRINUSE`. Nearly always the
-pre-1.0 `server/displayServer.js`, which bound the same port and keeps running
-even though the file has been deleted:
+Consider setting up ufw:
 
 ```bash
-sudo ss -ltnp | grep 3001
-pkill -f displayServer.js
-./pi-setup/install.sh
+sudo apt install ufw
+sudo ufw allow ssh
+sudo ufw enable
 ```
 
-The installer now checks this before installing the unit, and removes whatever
-was starting the old server at boot (autostart files, crontab, stray units).
+## 🎨 Touch-Friendly Features
 
-**Brightness doesn't change.** If `/healthz` lists a backlight path, your `video`
-group membership hasn't taken effect — log out and back in, or reboot. Verify by
-hand:
+The UI has been optimized for touchscreen use:
+
+- All interactive buttons are minimum 48x48 pixels
+- Added `touch-manipulation` CSS for better touch response
+- Increased tap targets on all controls:
+  - Settings gear icon
+  - Refresh buttons
+  - Pause/play button
+  - Modal buttons
+- Smooth scrolling with momentum
+- No text selection on UI elements
+- Visual feedback on touch (active states)
+
+## 📱 Screen Wake-up
+
+To wake the screen by touch:
+
+1. The Pi should wake from DPMS sleep on touch automatically
+2. If not, disable DPMS entirely by ensuring `xset -dpms` is in the startup script (already included)
+
+## 🔄 Update Schedule
+
+By default, the system checks for updates at **3:00 AM** daily. To change this:
 
 ```bash
-ls -l /sys/class/backlight/*/brightness
-groups
+# Edit crontab
+crontab -e
+
+# Change the time (format: minute hour day month weekday)
+# Example: 2 AM instead of 3 AM
+0 2 * * * /home/pi/home-interface/pi-setup/daily-update.sh
 ```
 
-**Shutdown/restart buttons do nothing.** Validate the sudoers drop-in:
+## ⚡ Performance Tips
 
-```bash
-sudo visudo -cf /etc/sudoers.d/home-interface
-```
+1. **Use Raspberry Pi 4 or 5** for best performance
+2. **Overclock** (optional): Edit `/boot/config.txt`
+   ```
+   over_voltage=2
+   arm_freq=1750
+   ```
+3. **Reduce GPU memory** if not needed: Add to `/boot/config.txt`
+   ```
+   gpu_mem=128
+   ```
 
-Set `HOME_INTERFACE_ALLOW_POWER=0` in the server unit to disable power control
-entirely.
+## 🆘 Support
 
-**Touch works but scrolling feels wrong.** The app uses native momentum
-scrolling. Make sure `--disable-pinch` is still in `kiosk-start.sh` and that
-nothing else is injecting touch emulation.
+If you encounter issues:
+1. Check the logs (see "Viewing Logs" section)
+2. Verify all prerequisites are met
+3. Try a fresh installation
+4. Check GitHub issues
 
-**Trains error but weather works.** The CTA key or station ID is wrong. Test the
-proxy directly:
+---
 
-```bash
-curl "localhost:3001/api/1.0/ttarrivals.aspx?key=YOUR_KEY&mapid=40380&outputType=JSON"
-```
+**Made with ❤️ for Raspberry Pi touchscreen kiosks**
 
-**Panel is the wrong resolution.** Set it in `/boot/firmware/config.txt`, e.g.
-`hdmi_cvt=1024 600 60` with `hdmi_group=2` and `hdmi_mode=87`.
 
-## Uninstall
 
-```bash
-sudo systemctl disable --now home-interface-server
-sudo rm -f /etc/systemd/system/home-interface-server.service
-sudo rm -f /etc/sudoers.d/home-interface /etc/udev/rules.d/90-backlight.rules
-sudo systemctl daemon-reload
-crontab -l | grep -v daily-update.sh | crontab -
-rm -f ~/.xinitrc
-```
 
-## Files
 
-| File | Purpose |
-| --- | --- |
-| `install.sh` | One-time setup |
-| `kiosk-start.sh` | Waits for the server, then launches Chromium (X11 or Wayland) |
-| `daily-update.sh` | Nightly pull, rebuild, restart, reboot; rolls back on build failure |
-| `diagnose.sh` | Read-only state dump for when the panel is blank |
-| `home-interface-server.service` | Control server unit (`__USER__`/`__APP_DIR__`/`__NODE__` templated) |
+
+
+
+

@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { DisplayContext } from '../context/displayStore';
 import { useSettings } from '../hooks/useSettings';
-import {
-  displayOff,
-  displayOn,
-  setBrightness,
-  ambientBrightness,
-} from '../lib/displayApi';
+import { displayOff, displayOn } from '../lib/displayApi';
 
 const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'];
 
@@ -23,10 +18,8 @@ const SleepMode = ({ children }) => {
   const { settings } = useSettings();
   const [isAsleep, setIsAsleep] = useState(false);
   const timerRef = useRef(null);
-  const brightnessRef = useRef(null);
 
   const idleMs = Math.max(0, Number(settings.idleSleepMinutes) || 0) * 60_000;
-  const ambientDimming = settings.ambientDimming !== false;
 
   const sleep = useCallback(() => {
     setIsAsleep((asleep) => {
@@ -38,13 +31,10 @@ const SleepMode = ({ children }) => {
 
   const wake = useCallback(() => {
     setIsAsleep((asleep) => {
-      if (asleep) {
-        displayOn();
-        if (ambientDimming) setBrightness(ambientBrightness());
-      }
+      if (asleep) displayOn();
       return false;
     });
-  }, [ambientDimming]);
+  }, []);
 
   // Idle countdown. Rearmed by any activity, and by waking.
   useEffect(() => {
@@ -67,23 +57,6 @@ const SleepMode = ({ children }) => {
       );
     };
   }, [idleMs, isAsleep, sleep]);
-
-  // Ambient dimming: follow a day/night curve while awake. The backlight server
-  // takes any 0–100 value, but the old client only ever sent full-on or off.
-  useEffect(() => {
-    if (!ambientDimming || isAsleep) return undefined;
-
-    const apply = () => {
-      const next = Math.round(ambientBrightness());
-      if (brightnessRef.current === next) return;
-      brightnessRef.current = next;
-      setBrightness(next);
-    };
-
-    apply();
-    const id = setInterval(apply, 60_000);
-    return () => clearInterval(id);
-  }, [ambientDimming, isAsleep]);
 
   // Ensure the panel is lit on first load.
   useEffect(() => {

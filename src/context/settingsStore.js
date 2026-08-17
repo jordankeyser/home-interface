@@ -17,8 +17,6 @@ export const DEFAULT_SETTINGS = {
   stockSymbols: 'AAPL, MSFT, TSLA',
   /** Minutes of inactivity before the panel sleeps. 0 disables sleep. */
   idleSleepMinutes: 3,
-  /** Dim the backlight on a day/night curve instead of only sleeping. */
-  ambientDimming: true,
   /** Preview the 1024x600 panel while developing on a desktop browser. */
   isPiMode: false,
   theme: 'dark',

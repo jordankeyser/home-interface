@@ -3,7 +3,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useDisplay } from '../hooks/useDisplay';
 import { themes } from '../config/themes';
 import { PROVIDERS } from '../lib/stockProviders';
-import { shutdownHost, rebootHost } from '../lib/displayApi';
+import { shutdownHost } from '../lib/displayApi';
 import ConfirmDialog from './ConfirmDialog';
 import {
   CloseIcon,
@@ -12,10 +12,9 @@ import {
   EyeOffIcon,
   MoonIcon,
   PowerIcon,
-  RefreshIcon,
 } from './icons';
 
-const SecretField =({ label, name, value, onChange, placeholder, hint }) => {
+const SecretField = ({ label, name, value, onChange, placeholder, hint }) => {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -256,13 +255,6 @@ const SettingsModal = ({ onClose }) => {
             </Section>
 
             <Section title="Display">
-              <Toggle
-                label="Ambient dimming"
-                hint="Lowers the backlight in the evening and overnight"
-                checked={form.ambientDimming !== false}
-                onChange={(v) => set({ ambientDimming: v })}
-              />
-
               <div>
                 <span className="label">Sleep after inactivity</span>
                 <div className="grid grid-cols-4 gap-2">
@@ -290,7 +282,7 @@ const SettingsModal = ({ onClose }) => {
             </Section>
 
             <Section title="Power">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -301,22 +293,6 @@ const SettingsModal = ({ onClose }) => {
                 >
                   <MoonIcon className="h-5 w-5" />
                   <span className="text-xs">Sleep</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfirm({
-                      title: 'Restart the Pi?',
-                      message: 'The panel will be dark for about a minute.',
-                      confirmLabel: 'Restart',
-                      action: rebootHost,
-                    })
-                  }
-                  className="btn flex-col gap-1 py-3"
-                >
-                  <RefreshIcon className="h-5 w-5" />
-                  <span className="text-xs">Restart</span>
                 </button>
 
                 <button
