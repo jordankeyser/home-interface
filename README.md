@@ -156,6 +156,17 @@ the power buttons, and the dashboard works without it (Vite proxies `/api`
 straight to the CTA). `HOME_INTERFACE_MODE=prod` serves the built `dist/`
 instead, falling back to dev mode if that isn't serving.
 
+## Display control
+
+`server/displayServer.js` cuts the panel backlight when the dashboard sleeps and
+restores it on touch, and handles shutdown. It runs as its own systemd service,
+independent of the kiosk boot path — if it isn't running, the dashboard still
+works and Sleep just blanks the screen.
+
+Install it with `./pi-setup/install-display-server.sh`. It binds loopback only
+and writes brightness through sysfs (via a udev rule granting the `video` group
+access) rather than shelling out to `sudo tee`.
+
 ## Behaviour on the wall
 
 - **Idle sleep** dims the backlight to zero rather than blanking via DPMS, so the

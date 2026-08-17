@@ -1,0 +1,29 @@
+[Unit]
+Description=Home Interface display control (backlight, shutdown)
+After=multi-user.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP_DIR__
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+ExecStart=__NODE__ __APP_DIR__/server/displayServer.js
+Restart=always
+RestartSec=5
+
+# Needs group write on /sys/class/backlight/*/brightness (granted by the udev
+# rule install-display-server.sh installs) and NOPASSWD sudo for shutdown.
+SupplementaryGroups=video
+
+# No sandboxing directives on purpose. An earlier unit set ProtectSystem/
+# ProtectHome/PrivateTmp and turned every failure into a silent exit-1 restart
+# loop. This service listens on loopback only. Do not add hardening here without
+# confirming on-device that it still starts.
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -14,7 +14,9 @@
  * blacks out but the backlight stays lit).
  */
 
-const CONTROL = 'http://localhost:3001';
+// 127.0.0.1, not "localhost": the server binds IPv4 loopback, and "localhost"
+// can resolve to ::1 first, which would fail to connect.
+const CONTROL = 'http://127.0.0.1:3001';
 
 const post = async (path) => {
   try {
