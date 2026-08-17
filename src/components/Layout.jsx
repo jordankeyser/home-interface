@@ -1,58 +1,80 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import SettingsModal from './SettingsModal';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../hooks/useSettings';
+
+/**
+ * Ambient background: three slow-drifting colour fields over the canvas.
+ * The classes these used to rely on (`animate-blob`, `animation-delay-2000`)
+ * were never defined anywhere, so the background was completely static.
+ */
+const Ambience = () => (
+  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div
+      className="absolute -top-1/4 -left-1/5 h-[70%] w-[70%] animate-drift-a rounded-full blur-[120px]"
+      style={{
+        background:
+          'radial-gradient(circle, rgb(var(--glow-a) / var(--glow-strength)) 0%, transparent 70%)',
+      }}
+    />
+    <div
+      className="absolute -top-1/5 -right-1/4 h-[65%] w-[65%] animate-drift-b rounded-full blur-[120px]"
+      style={{
+        background:
+          'radial-gradient(circle, rgb(var(--glow-b) / var(--glow-strength)) 0%, transparent 70%)',
+      }}
+    />
+    <div
+      className="absolute -bottom-1/3 left-1/4 h-[70%] w-[70%] animate-drift-c rounded-full blur-[120px]"
+      style={{
+        background:
+          'radial-gradient(circle, rgb(var(--glow-c) / var(--glow-strength)) 0%, transparent 70%)',
+      }}
+    />
+  </div>
+);
 
 const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
-    const [localSettingsOpen, setLocalSettingsOpen] = useState(false);
-    const { settings, currentTheme } = useSettings();
+  const [localOpen, setLocalOpen] = useState(false);
+  const { settings } = useSettings();
 
-    const isPiMode = settings.isPiMode;
-    const theme = currentTheme.colors;
-    const blobA = theme.blobA || 'bg-purple-600';
-    const blobB = theme.blobB || 'bg-blue-600';
-    const blobC = theme.blobC || 'bg-pink-600';
-    const blobOpacity = theme.blobOpacity || 'opacity-20';
-    const blobBlend = theme.blobBlend || 'mix-blend-multiply';
-    const bgVignette = theme.bgVignette || '';
+  const isPiMode = settings.isPiMode;
+  const settingsOpen = isSettingsOpen ?? localOpen;
+  const setSettingsOpen = setIsSettingsOpen || setLocalOpen;
 
-    // Use passed props if available, otherwise use local state
-    const settingsOpen = isSettingsOpen !== undefined ? isSettingsOpen : localSettingsOpen;
-    const setSettingsOpen = setIsSettingsOpen || setLocalSettingsOpen;
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-canvas text-fg">
+      {/* In Pi mode, frame a 1024x600 viewport so the real panel can be
+          previewed from a desktop browser. */}
+      <div
+        className={
+          isPiMode
+            ? 'relative h-[600px] w-[1024px] overflow-hidden rounded-2xl border-8 border-neutral-800 bg-canvas shadow-2xl'
+            : 'relative h-full w-full overflow-hidden'
+        }
+      >
+        <div
+          className="absolute inset-0 bg-canvas"
+          style={{
+            backgroundImage:
+              'radial-gradient(120% 90% at 50% 0%, var(--canvas-2) 0%, var(--canvas) 62%)',
+          }}
+        />
+        <Ambience />
 
-    return (
-        <div className={`min-h-screen w-full ${theme.textPrimary} relative overflow-hidden flex items-center justify-center ${!isPiMode ? `bg-gradient-to-br ${theme.bgPrimary}` : 'bg-black'}`}>
+        {/* animate-shift creeps the whole panel ~2px over 15 minutes so an
+            always-on wall display never holds one pixel value all day. */}
+        <main className="relative z-10 h-full w-full animate-shift p-4">
+          <div className="mx-auto grid h-full min-h-0 w-full max-w-[1500px] grid-cols-1 gap-4 md:grid-cols-[42%_58%]">
+            {children}
+          </div>
+        </main>
+      </div>
 
-            {/* Emulator Container */}
-            <div
-                className={`relative transition-all duration-500 ease-in-out ${isPiMode
-                    ? 'overflow-hidden w-[1024px] h-[600px] border-8 border-gray-800 rounded-xl shadow-2xl bg-gray-900'
-                    : 'overflow-visible w-full h-screen'
-                    }`}
-                style={isPiMode ? { transform: 'scale(0.85)', transformOrigin: 'center' } : {}}
-            >
-                {/* Background Elements (Inside Container) */}
-                <div className={`absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none bg-gradient-to-br ${theme.bgPrimary}`}>
-                    {bgVignette && <div className={`absolute inset-0 ${bgVignette}`}></div>}
-                    <div className={`absolute top-[-10%] left-[-10%] w-96 h-96 ${blobA} rounded-full ${blobBlend} filter blur-3xl ${blobOpacity} animate-blob`}></div>
-                    <div className={`absolute top-[-10%] right-[-10%] w-96 h-96 ${blobB} rounded-full ${blobBlend} filter blur-3xl ${blobOpacity} animate-blob animation-delay-2000`}></div>
-                    <div className={`absolute bottom-[-20%] left-[20%] w-96 h-96 ${blobC} rounded-full ${blobBlend} filter blur-3xl ${blobOpacity} animate-blob animation-delay-4000`}></div>
-                </div>
-
-                {/* Main Content Container */}
-                <main className="relative z-10 h-full min-h-0 flex flex-col w-full py-4">
-                    {/* Single centered wrapper ensures perfectly even left/right gutters */}
-                    {/* Slight right-gutter bias to visually balance the Train scrollbar on the right */}
-                    <div className="flex-1 min-h-0 w-full max-w-[1400px] mx-auto pl-6 pr-10">
-                        <div className="h-full min-h-0 grid grid-cols-1 md:grid-cols-[45%_55%] gap-4 overflow-visible w-full">
-                            {children}
-                        </div>
-                    </div>
-                </main>
-            </div>
-
-            <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-        </div>
-    );
+      {/* Mounted only while open, so its form state initialises from settings
+          each time instead of needing a setState-in-effect sync. */}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+    </div>
+  );
 };
 
 export default Layout;

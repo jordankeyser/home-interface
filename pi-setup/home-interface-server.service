@@ -1,0 +1,31 @@
+[Unit]
+Description=Home Interface control server (static build, CTA proxy, backlight)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__APP_DIR__
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+ExecStart=/usr/bin/node __APP_DIR__/server/index.js
+Restart=always
+RestartSec=5
+
+# The server needs sysfs backlight writes (granted via udev + the video group)
+# and sudo shutdown (granted via a NOPASSWD drop-in). Everything else is locked
+# down — it listens on loopback only and serves a static build.
+SupplementaryGroups=video
+NoNewPrivileges=no
+PrivateTmp=yes
+ProtectHome=read-only
+ProtectSystem=full
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

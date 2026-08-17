@@ -1,245 +1,159 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSettings } from '../../../context/SettingsContext';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSettings } from '../../../hooks/useSettings';
+import { useDisplay } from '../../../hooks/useDisplay';
+import { getProvider, parseSymbols } from '../../../lib/stockProviders';
+import { isAbortError } from '../../../lib/fetchJson';
+import { PauseIcon, PlayIcon, TrendUpIcon, TrendDownIcon } from '../../icons';
 
-// Target: update each symbol about once per minute, without exceeding ~1 request/sec.
-const TARGET_FULL_CYCLE_MS = 60_000;
-const MIN_REQUEST_INTERVAL_MS = 1100; // Alpha Vantage guidance: ~1 request/second
-const PX_PER_SECOND = 28; // slow, constant movement
-const MIN_DURATION_S = 18;
-
-function parseSymbols(input) {
-  if (!input) return [];
-  return input
-    .split(',')
-    .map(s => s.trim().toUpperCase())
-    .filter(Boolean);
-}
-
-async function fetchFinnhubQuote(symbol, token) {
-  // deprecated (kept only to avoid unused-function churn if you swap providers later)
-  void symbol;
-  void token;
-  throw new Error('Finnhub is not configured');
-}
-
-async function fetchAlphaVantageQuote(symbol, apiKey) {
-  const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${encodeURIComponent(symbol)}&apikey=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Quote failed (${res.status})`);
-  const data = await res.json();
-
-  if (data?.Note) throw new Error('Alpha Vantage rate limit hit. Quotes will resume shortly.');
-  if (data?.Information) throw new Error(String(data.Information));
-  if (data?.['Error Message']) throw new Error('Invalid symbol or request.');
-
-  const q = data?.['Global Quote'];
-  const price = Number(q?.['05. price']);
-  const change = Number(q?.['09. change']);
-  const changePctRaw = String(q?.['10. change percent'] || '');
-  const changePct = Number(changePctRaw.replace('%', ''));
-
-  return {
-    symbol,
-    price,
-    change,
-    changePct,
-    ts: Date.now(),
-  };
-}
+const PX_PER_SECOND = 26;
+const MIN_DURATION_S = 20;
 
 const StocksModule = () => {
-  const { settings, currentTheme } = useSettings();
-  const theme = currentTheme.colors;
+  const { settings } = useSettings();
+  const { isAsleep } = useDisplay();
 
-  const moduleCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-xl rounded-3xl`;
-  const symbols = useMemo(() => parseSymbols(settings.stockSymbols), [settings.stockSymbols]);
+  const symbols = useMemo(
+    () => parseSymbols(settings.stockSymbols),
+    [settings.stockSymbols]
+  );
   const apiKey = (settings.stockApiKey || '').trim();
+  const provider = useMemo(
+    () => getProvider(settings.stockProvider),
+    [settings.stockProvider]
+  );
 
   const [quotes, setQuotes] = useState(() => new Map());
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isRateLimited, setIsRateLimited] = useState(false);
-  const [isTickerPaused, setIsTickerPaused] = useState(false);
-
-  const runIdRef = useRef(0);
-  const nextIndexRef = useRef(0);
-
-  const trackRef = useRef(null);
+  const [paused, setPaused] = useState(false);
   const [tickerStyle, setTickerStyle] = useState({});
 
-  const getPerRequestIntervalMs = (count) => {
-    if (!count) return TARGET_FULL_CYCLE_MS;
-    return Math.max(MIN_REQUEST_INTERVAL_MS, Math.floor(TARGET_FULL_CYCLE_MS / count));
-  };
+  const trackRef = useRef(null);
+  const symbolKey = symbols.join(',');
 
-  const fetchNextSymbol = async (runId) => {
-    if (!apiKey || symbols.length === 0) {
-      setQuotes(new Map());
-      setIsRateLimited(false);
-      return;
-    }
-    const idx = nextIndexRef.current % symbols.length;
-    nextIndexRef.current = (idx + 1) % symbols.length;
-    const sym = symbols[idx];
-
-    setIsRefreshing(true);
-    try {
-      const q = await fetchAlphaVantageQuote(sym, apiKey);
-      if (runIdRef.current !== runId) return;
-      setQuotes((prev) => {
-        const next = new Map(prev);
-        next.set(q.symbol, q);
-        return next;
-      });
-      setIsRateLimited(false);
-    } catch (e) {
-      if (runIdRef.current !== runId) return;
-      // Silent handling: keep last known quotes (if any) and hide values if rate-limited.
-      const msg = String(e?.message || '').toLowerCase();
-      if (msg.includes('rate limit') || msg.includes('alpha vantage')) {
-        setIsRateLimited(true);
-      }
-    } finally {
-      if (runIdRef.current === runId) setIsRefreshing(false);
-    }
-  };
-
-  const handleManualRefresh = () => {
-    // Trigger an immediate single fetch (still rate-safe).
-    runIdRef.current += 1;
-    fetchNextSymbol(runIdRef.current);
-  };
-
-  const toggleTickerPaused = () => setIsTickerPaused((p) => !p);
-
-  // Start/Restart the refresh loop when symbols/apiKey change.
-  // We fetch one symbol per tick so we never burst requests.
+  // One symbol per tick, spaced to respect the provider's quota. Every request
+  // is abortable so a slow response can't overwrite a newer quote.
   useEffect(() => {
-    runIdRef.current += 1;
-    const runId = runIdRef.current;
-    nextIndexRef.current = 0;
-    setIsRateLimited(false);
+    if (!apiKey || symbols.length === 0 || isAsleep) return undefined;
 
-    // Kick off immediately, then tick at a rate that updates the full list ~once/min.
-    fetchNextSymbol(runId);
-    const interval = getPerRequestIntervalMs(symbols.length);
-    const id = setInterval(() => fetchNextSymbol(runId), interval);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [symbols.join(','), apiKey]);
+    const controller = new AbortController();
+    let index = 0;
+    let cancelled = false;
 
-  // Compute marquee distance/duration for seamless, constant movement
+    const spacing = Math.max(
+      provider.minRequestMs,
+      Math.floor(provider.cycleMs / symbols.length)
+    );
+
+    const tick = async () => {
+      const symbol = symbols[index % symbols.length];
+      index += 1;
+
+      try {
+        const quote = await provider.fetchQuote(symbol, apiKey, controller.signal);
+        if (cancelled) return;
+        setQuotes((prev) => new Map(prev).set(quote.symbol, quote));
+      } catch (err) {
+        if (isAbortError(err) || cancelled) return;
+        // Keep the last good quote on screen; a missing one just renders as the
+        // bare symbol rather than blanking the whole ticker.
+        console.warn(`[stocks] ${symbol}:`, err.message);
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, spacing);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      clearInterval(id);
+    };
+  }, [apiKey, symbolKey, symbols, provider, isAsleep]);
+
+  // Marquee geometry: items render twice, so half the track is one full cycle.
   useEffect(() => {
     const el = trackRef.current;
-    if (!el) return;
+    if (!el) return undefined;
 
     const compute = () => {
-      // We render the items twice; half the scrollWidth is one full cycle.
       const half = Math.max(1, Math.floor(el.scrollWidth / 2));
-      const duration = Math.max(MIN_DURATION_S, Math.round(half / PX_PER_SECOND));
       setTickerStyle({
         '--ticker-distance': `-${half}px`,
-        '--ticker-duration': `${duration}s`,
+        '--ticker-duration': `${Math.max(
+          MIN_DURATION_S,
+          Math.round(half / PX_PER_SECOND)
+        )}s`,
       });
     };
 
     compute();
-    const ro = new ResizeObserver(() => compute());
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [symbols.length, quotes.size]);
+    const observer = new ResizeObserver(compute);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [symbolKey, quotes.size]);
 
   const items = useMemo(() => {
-    // Always render something for smooth motion, even before quotes load.
     const base = symbols.length ? symbols : ['AAPL', 'MSFT', 'TSLA'];
-    const makeItem = (sym) => {
-      const q = quotes.get(sym);
-      const price = q?.price;
-      const changePct = q?.changePct;
-      const isUp = typeof changePct === 'number' ? changePct >= 0 : true;
-      return {
-        symbol: sym,
-        price,
-        changePct,
-        isUp,
-      };
-    };
-    const row = base.map(makeItem);
-    return [...row, ...row]; // duplicate for seamless loop
+    const row = base.map((symbol) => ({ symbol, quote: quotes.get(symbol) }));
+    return [...row, ...row];
   }, [symbols, quotes]);
 
+  const status = !apiKey ? 'Needs API key' : paused ? 'Paused' : 'Live';
+
   return (
-    <div className={`w-full h-full ${moduleCard} p-2 flex flex-col min-w-0 overflow-hidden`}>
-      <div className="flex items-center justify-between mb-0.5">
-        <div className={`min-w-0 text-base md:text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
-          <span className={`w-1.5 h-5 ${theme.accentColor} rounded-full`} />
-          <span className="truncate">Portfolio</span>
-        </div>
-        <div className="flex items-center -space-x-1 flex-shrink-0">
-          <div className={`text-[10px] ${theme.textSecondary} whitespace-nowrap mr-1`}>
-            {!apiKey ? 'Needs API key' : isRefreshing ? 'Updating' : isTickerPaused ? 'Paused' : 'Live'}
-          </div>
+    <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden px-4 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <span className="eyebrow">Markets</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-fg-faint">{status}</span>
           <button
             type="button"
-            onClick={toggleTickerPaused}
-            className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center ${isTickerPaused ? 'text-yellow-400' : theme.textSecondary}`}
-            title={isTickerPaused ? 'Resume ticker' : 'Pause ticker'}
-            aria-label={isTickerPaused ? 'Resume ticker' : 'Pause ticker'}
+            onClick={() => setPaused((p) => !p)}
+            className="icon-btn icon-btn-sm"
+            data-state={paused ? 'on' : 'off'}
+            aria-label={paused ? 'Resume ticker' : 'Pause ticker'}
           >
-            {isTickerPaused ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-              </svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            disabled={!apiKey || isRefreshing}
-            className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[36px] min-h-[36px] flex items-center justify-center ${isRefreshing ? 'animate-spin opacity-60' : ''}`}
-            title="Refresh Portfolio"
-            aria-label="Refresh Portfolio"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${theme.textSecondary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            {paused ? <PlayIcon className="h-4 w-4" /> : <PauseIcon className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      {!apiKey && (
-        <div className={`${theme.textSecondary} text-xs`}>
-          Add a Stock API key in Settings to load quotes.
-        </div>
-      )}
-
-      <div className="mt-0.5 relative flex-1 min-h-0 overflow-hidden stock-ticker-mask">
+      <div className="stock-ticker-mask relative min-h-0 flex-1 overflow-hidden">
         <div
           ref={trackRef}
-          className={`stock-ticker-track flex items-center gap-6 whitespace-nowrap will-change-transform ${isTickerPaused ? 'stock-ticker-paused' : ''}`}
+          className={`stock-ticker-track flex h-full items-center gap-8 whitespace-nowrap will-change-transform ${
+            paused ? 'stock-ticker-paused' : ''
+          }`}
           style={tickerStyle}
-          aria-label="Scrolling stock ticker"
+          aria-label="Stock ticker"
         >
-          {items.map((it, idx) => (
-            <div key={`${it.symbol}-${idx}`} className="flex items-center gap-2">
-              <span className={`${theme.textPrimary} text-lg font-semibold tracking-wide`}>
-                {it.symbol}
-              </span>
-              {!isRateLimited && typeof it.price === 'number' && it.price > 0 && (
-                <span className={`${theme.textSecondary} text-sm tabular-nums`}>
-                  {it.price.toFixed(2)}
+          {items.map(({ symbol, quote }, idx) => {
+            const pct = quote?.changePct;
+            const hasPct = typeof pct === 'number' && Number.isFinite(pct);
+            const isUp = hasPct && pct >= 0;
+            const Trend = isUp ? TrendUpIcon : TrendDownIcon;
+
+            return (
+              <div key={`${symbol}-${idx}`} className="flex items-center gap-2.5">
+                <span className="text-base font-semibold tracking-wide text-fg">
+                  {symbol}
                 </span>
-              )}
-              {!isRateLimited && typeof it.changePct === 'number' && (
-                <span className={`text-sm tabular-nums font-medium ${it.isUp ? 'text-emerald-300' : 'text-rose-300'}`}>
-                  {`${it.changePct >= 0 ? '+' : ''}${it.changePct.toFixed(2)}%`}
-                </span>
-              )}
-            </div>
-          ))}
+                {typeof quote?.price === 'number' && (
+                  <span className="nums text-sm text-fg-muted">
+                    {quote.price.toFixed(2)}
+                  </span>
+                )}
+                {hasPct && (
+                  <span
+                    className="nums flex items-center gap-1 text-sm font-medium"
+                    style={{ color: isUp ? 'var(--positive)' : 'var(--negative)' }}
+                  >
+                    <Trend className="h-3.5 w-3.5" />
+                    {`${isUp ? '+' : ''}${pct.toFixed(2)}%`}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -247,5 +161,3 @@ const StocksModule = () => {
 };
 
 export default StocksModule;
-
-

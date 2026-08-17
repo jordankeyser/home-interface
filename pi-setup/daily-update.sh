@@ -1,46 +1,71 @@
-#!/bin/bash
-# Daily Update Script - Pulls latest changes from git
-# This script runs once per day to update the application
+#!/usr/bin/env bash
+#
+# Pulls the latest code, rebuilds, and restarts the services.
+#
+# Fixes vs. the previous version:
+#   - restarts the SYSTEM units (it used `systemctl --user`, which could never
+#     work because install.sh installs into /etc/systemd/system)
+#   - actually rebuilds; the app is now served from dist/, not a dev server
+#   - a dirty working tree no longer silently disables updates forever
+set -uo pipefail
 
-REPO_DIR="/home/jordankeyser/Desktop/home-interface"
-LOG_FILE="/home/jordankeyser/Desktop/home-interface/logs/update.log"
+APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+LOG_FILE="${LOG_FILE:-$APP_DIR/logs/update.log}"
+BRANCH="${BRANCH:-main}"
+# Pass --force (or FORCE=1) to discard local edits and update anyway.
+FORCE="${FORCE:-0}"
+[[ "${1:-}" == "--force" ]] && FORCE=1
 
-# Create logs directory if it doesn't exist
 mkdir -p "$(dirname "$LOG_FILE")"
+exec >>"$LOG_FILE" 2>&1
 
-echo "----------------------------------------" >> "$LOG_FILE"
-echo "Update check started at $(date)" >> "$LOG_FILE"
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-cd "$REPO_DIR" || exit 1
+log "----- update check started -----"
+cd "$APP_DIR" || { log "ERROR: cannot cd to $APP_DIR"; exit 1; }
 
-# Check if there are local changes
-if [[ -n $(git status -s) ]]; then
-    echo "WARNING: Local changes detected, skipping update" >> "$LOG_FILE"
+if [[ -n "$(git status --porcelain)" ]]; then
+    if [[ "$FORCE" == "1" ]]; then
+        log "WARNING: discarding local changes (--force)"
+        git reset --hard
+        git clean -fd
+    else
+        log "WARNING: local changes present, skipping update."
+        log "         Auto-update stays blocked until the tree is clean."
+        log "         Files:"
+        git status --porcelain | sed 's/^/           /'
+        log "         Re-run with --force to discard them."
+        exit 0
+    fi
+fi
+
+git fetch origin "$BRANCH" || { log "ERROR: git fetch failed"; exit 1; }
+
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse "origin/$BRANCH")
+
+if [[ "$LOCAL" == "$REMOTE" ]]; then
+    log "Already up to date ($(git rev-parse --short HEAD))."
     exit 0
 fi
 
-# Fetch latest changes
-git fetch origin main >> "$LOG_FILE" 2>&1
+log "Updating ${LOCAL:0:7} -> ${REMOTE:0:7}"
+git merge --ff-only "origin/$BRANCH" || { log "ERROR: fast-forward failed"; exit 1; }
 
-# Check if update is available
-LOCAL=$(git rev-parse @)
-REMOTE=$(git rev-parse @{u})
+log "Installing dependencies..."
+npm ci --omit=dev 2>/dev/null || npm install || { log "ERROR: npm install failed"; exit 1; }
 
-if [ "$LOCAL" = "$REMOTE" ]; then
-    echo "Already up to date" >> "$LOG_FILE"
-else
-    echo "Updates found, pulling changes..." >> "$LOG_FILE"
-    git pull origin main >> "$LOG_FILE" 2>&1
-    
-    # Install any new dependencies
-    npm install >> "$LOG_FILE" 2>&1
-    
-    echo "Update completed successfully" >> "$LOG_FILE"
-    echo "Restarting kiosk service..." >> "$LOG_FILE"
-    
-    # Restart the kiosk service to apply changes
-    systemctl --user restart home-interface-kiosk.service >> "$LOG_FILE" 2>&1
+log "Building..."
+if ! npm run build; then
+    log "ERROR: build failed — rolling back to $LOCAL so the panel keeps working"
+    git reset --hard "$LOCAL"
+    npm install
+    npm run build || log "ERROR: rollback build also failed"
+    exit 1
 fi
 
-echo "Update check completed at $(date)" >> "$LOG_FILE"
+log "Restarting services..."
+sudo -n systemctl restart home-interface-server.service || log "WARNING: server restart failed"
+sudo -n systemctl restart home-interface-kiosk.service || log "WARNING: kiosk restart failed"
 
+log "Update complete at $(git rev-parse --short HEAD)."

@@ -1,57 +1,55 @@
-import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
-import { getTheme } from '../config/themes';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { resolveThemeId } from '../config/themes';
+import {
+  SettingsContext,
+  DEFAULT_SETTINGS,
+  STORAGE_KEY,
+} from './settingsStore';
 
-const SettingsContext = createContext();
+const loadSettings = () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return DEFAULT_SETTINGS;
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const useSettings = () => useContext(SettingsContext);
+  try {
+    const parsed = JSON.parse(saved);
+    if (!parsed || typeof parsed !== 'object') return DEFAULT_SETTINGS;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      // Old installs may hold a theme id that no longer exists.
+      theme: resolveThemeId(parsed.theme),
+    };
+  } catch (e) {
+    // localStorage can end up corrupted after an unclean shutdown, which is
+    // routine on a Pi that loses power.
+    console.error('Invalid saved settings; resetting to defaults.', e);
+    localStorage.removeItem(STORAGE_KEY);
+    return DEFAULT_SETTINGS;
+  }
+};
 
 export const SettingsProvider = ({ children }) => {
-    const [settings, setSettings] = useState(() => {
-        const defaults = {
-            ctaApiKey: '',
-            ctaStationId: '40380', // Default to a station (e.g., Clark/Lake or similar)
-            zipCode: '60601', // Default to Chicago Loop
-            stockApiKey: '',
-            stockSymbols: 'AAPL, MSFT, TSLA',
-            isPiMode: false,
-            theme: 'dark', // Default theme
-        };
+  const [settings, setSettings] = useState(loadSettings);
 
-        const savedSettings = localStorage.getItem('home-interface-settings');
-        if (!savedSettings) return defaults;
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  }, [settings]);
 
-        try {
-            const parsed = JSON.parse(savedSettings);
-            // Be defensive: ensure it's an object so we don't break on unexpected values.
-            return (parsed && typeof parsed === 'object') ? { ...defaults, ...parsed } : defaults;
-        } catch (e) {
-            // If localStorage got corrupted (common after a crash), reset to defaults.
-            console.error('Invalid saved settings; resetting to defaults.', e);
-            localStorage.removeItem('home-interface-settings');
-            return defaults;
-        }
-    });
+  // Themes are CSS variables keyed off this attribute.
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolveThemeId(settings.theme);
+  }, [settings.theme]);
 
-    useEffect(() => {
-        localStorage.setItem('home-interface-settings', JSON.stringify(settings));
-    }, [settings]);
+  const updateSettings = useCallback((partial) => {
+    setSettings((prev) => ({ ...prev, ...partial }));
+  }, []);
 
-    const updateSettings = (newSettings) => {
-        setSettings((prev) => ({ ...prev, ...newSettings }));
-    };
+  const value = useMemo(
+    () => ({ settings, updateSettings }),
+    [settings, updateSettings]
+  );
 
-    const currentTheme = useMemo(() => getTheme(settings.theme), [settings.theme]);
-
-    const value = useMemo(() => ({
-        settings,
-        updateSettings,
-        currentTheme
-    }), [settings, currentTheme]);
-
-    return (
-        <SettingsContext.Provider value={value}>
-            {children}
-        </SettingsContext.Provider>
-    );
+  return (
+    <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
+  );
 };

@@ -1,18 +1,22 @@
 [Unit]
-Description=Home Interface Kiosk
-After=network-online.target graphical.target
-Wants=network-online.target
+Description=Home Interface Kiosk (Chromium)
+# The control server serves the UI, so wait for it rather than racing it.
+After=home-interface-server.service graphical.target
+Wants=home-interface-server.service
+PartOf=graphical.target
 
 [Service]
 Type=simple
-User=jordankeyser
+User=__USER__
 Environment=DISPLAY=:0
-Environment=XAUTHORITY=/home/jordankeyser/.Xauthority
-WorkingDirectory=/home/jordankeyser/Desktop/home-interface
-ExecStart=/home/jordankeyser/Desktop/home-interface/pi-setup/kiosk-start.sh
+Environment=XAUTHORITY=/home/__USER__/.Xauthority
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/pi-setup/kiosk-start.sh
 Restart=always
 RestartSec=10
 
+StandardOutput=journal
+StandardError=journal
+
 [Install]
 WantedBy=graphical.target
-

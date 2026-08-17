@@ -1,116 +1,467 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
 @import "tailwindcss";
 
-/* Custom styles for glassmorphism and scrollbars */
-@theme {
-  --font-sans: 'Inter', system-ui, sans-serif;
-
-  /* Custom Animations */
-  --animate-float: float 6s ease-in-out infinite;
-  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-pulse-fast: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-spin-slow: spin 8s linear infinite;
-  --animate-bounce-slight: bounce-slight 2s infinite;
+/* ---------------------------------------------------------------------------
+   Fonts — self-hosted so the panel renders correctly before the network is up.
+   Inter variable (300–800) in one file per subset.
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/inter-latin-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* Define keyframes globally as fallback if @theme nesting has issues */
-@keyframes float {
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext-var.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
-  0%,
-  100% {
-    transform: translateY(0);
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Themes are plain CSS custom properties swapped by `data-theme` on <html>,
+   NOT Tailwind class-name strings. This is what makes `bg-surface`, `text-fg`
+   etc. work across themes, lets themes cross-fade, and avoids the old
+   `hover:${theme.textAccent}` pattern that Tailwind could never see.
+   --------------------------------------------------------------------------- */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Canvas */
+  --canvas: #06080d;
+  --canvas-2: #0b1017;
+  --glow-a: 0 171 255;
+  --glow-b: 139 92 246;
+  --glow-c: 34 211 238;
+  --glow-strength: 0.22;
+
+  /* Surfaces */
+  --surface: rgb(255 255 255 / 0.045);
+  --surface-hover: rgb(255 255 255 / 0.07);
+  --surface-active: rgb(255 255 255 / 0.1);
+  --surface-inset: rgb(0 0 0 / 0.25);
+  --line: rgb(255 255 255 / 0.09);
+  --line-strong: rgb(255 255 255 / 0.16);
+
+  /* Text — three levels, nothing more */
+  --fg: #f3f6fa;
+  --fg-muted: #93a1b5;
+  --fg-faint: #5d6b7f;
+
+  /* Accents */
+  --accent: #35b6ff;
+  --accent-fg: #04121c;
+  --positive: #34d399;
+  --negative: #fb7185;
+  --warning: #fbbf24;
+  --danger: #f87171;
+
+  /* Elevation — one soft shadow, not three stacked insets */
+  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.05) inset,
+    0 18px 48px -12px rgb(0 0 0 / 0.7);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #eef1f6;
+  --canvas-2: #f8fafc;
+  --glow-a: 56 132 255;
+  --glow-b: 129 140 248;
+  --glow-c: 14 165 233;
+  --glow-strength: 0.14;
+
+  --surface: rgb(255 255 255 / 0.78);
+  --surface-hover: rgb(255 255 255 / 0.92);
+  --surface-active: rgb(255 255 255 / 1);
+  --surface-inset: rgb(15 23 42 / 0.045);
+  --line: rgb(15 23 42 / 0.1);
+  --line-strong: rgb(15 23 42 / 0.18);
+
+  --fg: #0d1420;
+  --fg-muted: #56637a;
+  --fg-faint: #8794a8;
+
+  --accent: #0b74d8;
+  --accent-fg: #ffffff;
+  --positive: #059669;
+  --negative: #dc2626;
+  --warning: #b45309;
+  --danger: #dc2626;
+
+  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.9) inset,
+    0 14px 36px -14px rgb(15 23 42 / 0.28);
+}
+
+/* Expose the tokens to Tailwind as utilities: bg-surface, text-fg, border-line…
+   `inline` keeps the var() reference in the output so theme swaps are live. */
+@theme inline {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --color-canvas: var(--canvas);
+  --color-canvas-2: var(--canvas-2);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-inset: var(--surface-inset);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  /* Type scale tuned for a wall panel read from 6–10 feet.
+     Nothing in the UI is allowed below --text-xs (13px). */
+  --text-xs: 0.8125rem; /* 13px — hard floor */
+  --text-sm: 0.9375rem; /* 15px */
+  --text-base: 1.0625rem; /* 17px */
+  --text-lg: 1.25rem; /* 20px */
+  --text-xl: 1.5rem; /* 24px */
+  --text-2xl: 1.875rem; /* 30px */
+  --text-3xl: 2.25rem; /* 36px */
+  --text-4xl: 3rem; /* 48px */
+  --text-5xl: 3.75rem; /* 60px */
+  --text-6xl: 4.5rem; /* 72px */
+  --text-7xl: 5.5rem; /* 88px */
+
+  --animate-drift-a: drift-a 26s ease-in-out infinite;
+  --animate-drift-b: drift-b 32s ease-in-out infinite;
+  --animate-drift-c: drift-c 38s ease-in-out infinite;
+  --animate-shift: burn-in-shift 900s linear infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--canvas);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-synthesis-weight: none;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Themes cross-fade instead of snapping. */
+  transition: background-color 400ms ease, color 400ms ease;
+}
+
+#root {
+  width: 100%;
+  text-align: left;
+}
+
+/* Tabular figures everywhere a number updates in place, so the clock, temps,
+   countdowns and prices don't jitter as digits change. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ---------------------------------------------------------------------------
+   Components — one confident surface, one hairline, one soft shadow.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .card {
+    position: relative;
+    border-radius: 1.5rem;
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(24px) saturate(140%);
+    -webkit-backdrop-filter: blur(24px) saturate(140%);
+    transition: background-color 250ms ease, border-color 250ms ease;
   }
 
-  50% {
-    transform: translateY(-10px);
+  .card-inset {
+    border-radius: 1rem;
+    background-color: var(--surface-inset);
+    border: 1px solid var(--line);
+    transition: background-color 200ms ease, border-color 200ms ease;
+  }
+
+  .card-inset-hover:active {
+    background-color: var(--surface-hover);
+  }
+
+  /* Every tappable control: 48px minimum, no exceptions. */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 9999px;
+    color: var(--fg-muted);
+    background-color: transparent;
+    border: 0;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, color 150ms ease,
+      transform 150ms ease;
+  }
+
+  .icon-btn:hover {
+    background-color: var(--surface-hover);
+    color: var(--fg);
+  }
+
+  .icon-btn:active {
+    background-color: var(--surface-active);
+    transform: scale(0.94);
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .icon-btn[data-state='on'] {
+    color: var(--warning);
+  }
+
+  /* Only for controls inside the short ticker strip, where 48px won't fit. */
+  .icon-btn-sm {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  /* Text buttons — also 48px tall. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding: 0 1.25rem;
+    border-radius: 0.875rem;
+    border: 1px solid var(--line);
+    background-color: var(--surface);
+    color: var(--fg);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, border-color 150ms ease,
+      transform 150ms ease;
+  }
+
+  .btn:hover {
+    background-color: var(--surface-hover);
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn-primary {
+    background-color: var(--accent);
+    border-color: transparent;
+    color: var(--accent-fg);
+  }
+
+  .btn-primary:hover {
+    background-color: var(--accent);
+    filter: brightness(1.08);
+  }
+
+  /* Inputs sized for a finger, not a mouse. */
+  .field {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 0.875rem;
+    border-radius: 0.875rem;
+    background-color: var(--surface-inset);
+    border: 1px solid var(--line);
+    color: var(--fg);
+    font-size: var(--text-base);
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .field:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+
+  .field::placeholder {
+    color: var(--fg-faint);
+  }
+
+  .label {
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--fg-muted);
+    margin-bottom: 0.375rem;
+  }
+
+  .divider {
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      var(--line-strong),
+      transparent
+    );
+  }
+
+  /* Small caps label used for section headers and stat captions. */
+  .eyebrow {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
   }
 }
 
-@keyframes bounce-slight {
-
+/* ---------------------------------------------------------------------------
+   Motion
+   --------------------------------------------------------------------------- */
+@keyframes drift-a {
   0%,
   100% {
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
+  33% {
+    transform: translate3d(6%, 8%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-4%, 4%, 0) scale(0.96);
+  }
+}
 
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(-7%, 5%, 0) scale(0.94);
+  }
+  66% {
+    transform: translate3d(5%, -6%, 0) scale(1.1);
+  }
+}
+
+@keyframes drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
   50% {
-    transform: translateY(-5px);
+    transform: translate3d(8%, -7%, 0) scale(1.06);
+  }
+}
+
+/* Anti burn-in: the whole panel creeps ~2px over 15 minutes. Invisible in use,
+   but enough that no pixel holds the same value all day on an always-on wall
+   display. */
+@keyframes burn-in-shift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(2px, 1px, 0);
+  }
+  50% {
+    transform: translate3d(1px, 2px, 0);
+  }
+  75% {
+    transform: translate3d(-1px, 1px, 0);
   }
 }
 
 @keyframes rain-fall {
   0% {
-    transform: translateY(-100%) translateX(0);
+    transform: translateY(-15%);
     opacity: 0;
   }
-
-  50% {
+  15% {
     opacity: 1;
   }
-
+  85% {
+    opacity: 1;
+  }
   100% {
-    transform: translateY(100vh) translateX(-20px);
+    transform: translateY(340%);
     opacity: 0;
   }
 }
 
 @keyframes snow-fall {
   0% {
-    transform: translateY(-100%) translateX(0) rotate(0deg);
+    transform: translate3d(0, -15%, 0);
     opacity: 0;
   }
-
-  50% {
+  20% {
     opacity: 1;
   }
-
+  80% {
+    opacity: 1;
+  }
   100% {
-    transform: translateY(100vh) translateX(20px) rotate(360deg);
+    transform: translate3d(14px, 340%, 0);
     opacity: 0;
   }
 }
 
 @keyframes cloud-drift {
   0% {
-    transform: translateX(-100%);
+    transform: translateX(-30%);
   }
-
   100% {
-    transform: translateX(400%);
+    transform: translateX(320%);
   }
 }
 
 @keyframes sun-pulse {
-
   0%,
   100% {
     transform: scale(1);
-    opacity: 0.8;
+    opacity: 0.55;
   }
-
   50% {
-    transform: scale(1.2);
-    opacity: 1;
+    transform: scale(1.14);
+    opacity: 0.8;
   }
 }
 
-@keyframes train-depart {
-  0% {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-
-  10% {
-    opacity: 1;
-  }
-
-  90% {
-    opacity: 1;
-  }
-
+@keyframes flash {
+  0%,
+  92%,
   100% {
-    transform: translateX(200%);
     opacity: 0;
+  }
+  94%,
+  97% {
+    opacity: 0.5;
   }
 }
 
@@ -132,159 +483,115 @@
 }
 
 .stock-ticker-mask {
-  /* Fade the ticker at the edges without drawing any visible overlay/background. */
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 6%,
+    black 94%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 6%,
+    black 94%,
+    transparent 100%
+  );
+}
+
+/* Fades a horizontally-scrolling row at its right edge so it reads as
+   continuing off-card rather than being abruptly clipped. */
+.edge-fade-x {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0%,
+    black 88%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to right, black 0%, black 88%, transparent 100%);
 }
 
 .train-scroll-mask {
-  /* Fade the train list at the bottom so it feels like it continues off-screen, without a visible overlay band. */
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 0%, black 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 86%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, black 0%, black 86%, transparent 100%);
 }
 
-body {
-  @apply bg-gray-900 text-white overflow-hidden;
-  font-family: var(--font-sans);
+/* Respect the OS setting — and keep the panel calm if motion is unwanted. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-/* Custom Scrollbar for Webkit - thick for touch */
-::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+/* ---------------------------------------------------------------------------
+   Touch / kiosk behaviour
+   --------------------------------------------------------------------------- */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+/* Native momentum scrolling — do not reimplement this in JS. */
+.scroll-y {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+.scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x;
 }
 
-/* Hide scrollbar but keep scrolling */
+/* Thick enough to grab with a fingertip. */
+.scroll-y::-webkit-scrollbar,
+.scroll-x::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scroll-y::-webkit-scrollbar-track,
+.scroll-x::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-y::-webkit-scrollbar-thumb,
+.scroll-x::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 9999px;
+}
+
 .scrollbar-hide {
-  -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
+  -ms-overflow-style: none;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
-  /* Chrome, Safari and Opera */
 }
 
-/* Thick scrollbar for touch devices */
-.custom-scrollbar::-webkit-scrollbar {
-  height: 16px;
-  width: 16px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  margin: 4px 0;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 10px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover,
-.custom-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(255, 255, 255, 0.7);
-}
-
-/* Touch-friendly styles for Raspberry Pi Kiosk */
-* {
-  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
-  -webkit-touch-callout: none;
-  /* Prevent text selection globally for touch devices */
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-/* Allow text selection only in input fields */
-input, textarea {
-  -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-  user-select: text;
-}
-
-/* Smooth scrolling with momentum on touch devices */
-.custom-scrollbar {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-}
-
-/* Prevent text selection on UI elements */
-button, .touch-manipulation {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Improve touch scrolling performance */
-.overflow-y-auto, .overflow-x-auto {
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  overscroll-behavior: contain;
-  /* Enable touch scrolling */
-  touch-action: pan-y pan-x;
-}
-
-/* Specific overrides for scrollable containers */
-.overflow-y-auto {
-  touch-action: pan-y;
-}
-
-.overflow-x-auto {
-  touch-action: pan-x;
-}
-
-/* Touch pan classes for explicit control */
-.touch-pan-y {
-  touch-action: pan-y;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-}
-
-.touch-pan-x {
-  touch-action: pan-x;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-x: contain;
-}
-
-/* Disable cursor for true kiosk mode */
 body.kiosk-mode {
   cursor: none;
-}
-
-/* Sleep mode - black screen (touch still works) */
-.sleep-mode-screen {
-  background-color: #000000 !important;
-}
-
-/* Optional: Hide cursor after inactivity */
-@media (pointer: coarse) {
-  /* Touch device specific styles */
-  button, a {
-    min-height: 44px;
-    min-width: 44px;
-  }
 }

@@ -1,68 +1,110 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useSettings } from '../context/SettingsContext';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSettings } from './useSettings';
+import { useDisplay } from './useDisplay';
+import { fetchJson, isAbortError, backoffDelay } from '../lib/fetchJson';
+
+/** 20s keeps arrival countdowns accurate at half the old request volume. */
+const REFRESH_MS = 20_000;
 
 export const useCTA = () => {
-    const { settings } = useSettings();
-    const [arrivals, setArrivals] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [lastUpdated, setLastUpdated] = useState(null);
-    const [stationName, setStationName] = useState('');
-    const [isPaused, setIsPaused] = useState(false);
+  const { settings } = useSettings();
+  const { isAsleep } = useDisplay();
+  const [arrivals, setArrivals] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [stationName, setStationName] = useState('');
+  const [isPaused, setIsPaused] = useState(false);
 
-    const fetchArrivals = useCallback(async () => {
-        if (isPaused) return; // Skip fetch if paused
+  const abortRef = useRef(null);
+  const attemptRef = useRef(0);
 
-        if (!settings.ctaApiKey || !settings.ctaStationId) {
-            setError('API Key and Station ID are required');
-            return;
-        }
+  const apiKey = (settings.ctaApiKey || '').trim();
+  const stationId = (settings.ctaStationId || '').trim();
 
-        setLoading(true);
-        setError(null);
+  const fetchArrivals = useCallback(async () => {
+    if (!apiKey || !stationId) {
+      setError('CTA API key and station ID required');
+      return;
+    }
 
-        try {
-            // Use local proxy if available (matches vite.config.js)
-            const baseUrl = '/api/1.0/ttarrivals.aspx';
-            const url = `${baseUrl}?key=${settings.ctaApiKey}&mapid=${settings.ctaStationId}&outputType=JSON`;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
-            const response = await fetch(url);
+    setLoading(true);
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+    try {
+      // Proxied by the local control server so the key never appears in a
+      // cross-origin request and CORS isn't an issue.
+      const url = `/api/1.0/ttarrivals.aspx?key=${encodeURIComponent(
+        apiKey
+      )}&mapid=${encodeURIComponent(stationId)}&outputType=JSON`;
 
-            const data = await response.json();
+      const data = await fetchJson(url, { signal: controller.signal });
 
-            if (data.ctatt.errCd !== "0") {
-                throw new Error(data.ctatt.errNm || 'Unknown CTA API Error');
-            }
+      if (data?.ctatt?.errCd !== '0') {
+        throw new Error(data?.ctatt?.errNm || 'CTA API error');
+      }
 
-            const etas = data.ctatt.eta || [];
-            setArrivals(etas);
+      const etas = data.ctatt.eta || [];
+      setArrivals(etas);
+      if (etas.length > 0) setStationName(etas[0].staNm);
+      setLastUpdated(new Date());
+      setError(null);
+      attemptRef.current = 0;
+    } catch (err) {
+      if (isAbortError(err)) return;
+      console.error('CTA fetch failed:', err);
+      attemptRef.current += 1;
+      setError(err.message || 'Failed to fetch arrivals');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiKey, stationId]);
 
-            // Extract station name from the first result if available
-            if (etas.length > 0) {
-                setStationName(etas[0].staNm);
-            }
+  useEffect(() => {
+    // No point polling a station board behind a dark backlight.
+    if (isPaused || isAsleep) return undefined;
 
-            setLastUpdated(new Date());
-        } catch (err) {
-            console.error("Failed to fetch CTA data:", err);
-            setError(err.message || 'Failed to fetch data');
-        } finally {
-            setLoading(false);
-        }
-    }, [settings.ctaApiKey, settings.ctaStationId, isPaused]);
+    fetchArrivals();
 
-    // Auto-refresh every 10 seconds
-    useEffect(() => {
-        fetchArrivals();
-        const interval = setInterval(fetchArrivals, 10000);
-        return () => clearInterval(interval);
-    }, [fetchArrivals]);
+    let cancelled = false;
+    let timer;
 
-    const togglePause = () => setIsPaused(prev => !prev);
+    const schedule = () => {
+      const delay =
+        attemptRef.current > 0
+          ? backoffDelay(attemptRef.current, REFRESH_MS, 2 * 60_000)
+          : REFRESH_MS;
+      timer = setTimeout(async () => {
+        if (cancelled) return;
+        await fetchArrivals();
+        if (!cancelled) schedule();
+      }, delay);
+    };
 
-    return { arrivals, loading, error, lastUpdated, refresh: fetchArrivals, stationName, isPaused, togglePause };
+    schedule();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
+  }, [fetchArrivals, isPaused, isAsleep]);
+
+  const togglePause = useCallback(() => setIsPaused((p) => !p), []);
+
+  return {
+    arrivals,
+    loading,
+    // Keep the last board visible through a blip rather than flashing an error.
+    error: arrivals.length > 0 ? null : error,
+    stale: Boolean(arrivals.length > 0 && error),
+    lastUpdated,
+    refresh: fetchArrivals,
+    stationName,
+    isPaused,
+    togglePause,
+  };
 };

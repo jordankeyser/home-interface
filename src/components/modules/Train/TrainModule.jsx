@@ -1,346 +1,253 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useCTA } from '../../../hooks/useCTA';
-import { useSettings } from '../../../context/SettingsContext';
+import { useDisplay } from '../../../hooks/useDisplay';
+import {
+  RefreshIcon,
+  PauseIcon,
+  PlayIcon,
+  ChevronDownIcon,
+  WarningIcon,
+  TrainIcon,
+} from '../../icons';
+
+/** Official CTA line colours, keyed by the API's route codes. */
+const LINE_COLORS = {
+  Red: '#c60c30',
+  Blue: '#00a1de',
+  Brn: '#62361b',
+  G: '#009b3a',
+  Org: '#f9461c',
+  P: '#522398',
+  Pink: '#e27ea6',
+  Y: '#f9e300',
+};
+
+const COLLAPSED_ROWS = 3;
+const EXPANDED_ROWS = 6;
 
 const TrainModule = () => {
-    const { arrivals, loading, error, lastUpdated, refresh, stationName, isPaused, togglePause } = useCTA();
-    const { currentTheme } = useSettings();
-    const theme = currentTheme.colors;
-    const moduleCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-xl rounded-3xl`;
-    const moduleCardInner = theme.moduleCardInner || theme.bgSecondary;
+  const {
+    arrivals,
+    loading,
+    error,
+    stale,
+    lastUpdated,
+    refresh,
+    stationName,
+    isPaused,
+    togglePause,
+  } = useCTA();
+  const { isAsleep } = useDisplay();
 
-    // Local state to manage the list with exit animations
-    const [displayedArrivals, setDisplayedArrivals] = useState([]);
-    const [exitingTrainIds, setExitingTrainIds] = useState(new Set());
-    const [expandedDirections, setExpandedDirections] = useState(() => new Set());
-    const prevArrivalsRef = useRef([]);
-    const moduleRef = useRef(null);
-    const scrollContainerRef = useRef(null);
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [now, setNow] = useState(() => Date.now());
 
-    // Helper to calculate minutes until arrival
-    const getMinutes = (arrivalString) => {
-        const now = new Date();
-        const arrival = new Date(arrivalString);
-        const diffMs = arrival - now;
-        const diffMins = Math.round(diffMs / 60000);
-        return diffMins <= 0 ? 'Due' : `${diffMins} min`;
-    };
+  // Countdowns stay accurate between fetches. setState here is inside an
+  // interval callback, which is the supported pattern.
+  useEffect(() => {
+    if (isAsleep) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(id);
+  }, [isAsleep]);
 
-    // Sync arrivals with local state and handle exit animations
-    useEffect(() => {
-        if (loading && arrivals.length === 0) return;
+  const minutesUntil = (arrT) => {
+    const mins = Math.round((new Date(arrT).getTime() - now) / 60_000);
+    return mins <= 0 ? null : mins;
+  };
 
-        const currentIds = new Set(arrivals.map(t => t.rn));
-        const prevArrivals = prevArrivalsRef.current;
+  // Mon–Thu the Loop platform matters most; Fri–Sun it's the other direction.
+  const loopFirst = useMemo(() => {
+    const day = new Date(now).getDay();
+    return day >= 1 && day <= 4;
+  }, [now]);
 
-        // 1. Identify trains that have departed (were present, now missing, and were "Due")
-        const departingTrains = prevArrivals.filter(t => {
-            const isMissing = !currentIds.has(t.rn);
-            const mins = getMinutes(t.arrT);
-            const wasDue = mins === 'Due' || mins === '1 min';
-            return isMissing && wasDue;
-        });
+  const groups = useMemo(() => {
+    const byDirection = new Map();
 
-        if (departingTrains.length > 0) {
-            // Mark them as exiting
-            const departingIds = departingTrains.map(t => t.rn);
-            setExitingTrainIds(prev => {
-                const next = new Set(prev);
-                departingIds.forEach(id => next.add(id));
-                return next;
-            });
+    arrivals.forEach((train) => {
+      const key = train.stpDe || train.destNm;
+      if (!byDirection.has(key)) byDirection.set(key, []);
+      byDirection.get(key).push(train);
+    });
 
-            // Wait for animation (e.g., 1s) then remove them and update list
-            setTimeout(() => {
-                setExitingTrainIds(prev => {
-                    const next = new Set(prev);
-                    departingIds.forEach(id => next.delete(id));
-                    return next;
-                });
-                // Update displayed list to match new API data
-                setDisplayedArrivals(arrivals);
-            }, 1000); // Match CSS animation duration
-        } else {
-            // No departures, just update the list (e.g., time updates, new trains)
-            // If we are currently animating an exit, don't overwrite yet
-            if (exitingTrainIds.size === 0) {
-                setDisplayedArrivals(arrivals);
-            }
-        }
-
-        prevArrivalsRef.current = arrivals;
-    }, [arrivals, loading, exitingTrainIds.size]);
-
-    // Enable scrolling from anywhere on the module (wheel + touch)
-    useEffect(() => {
-        const moduleElement = moduleRef.current;
-        const scrollContainer = scrollContainerRef.current;
-
-        if (!moduleElement || !scrollContainer) return;
-
-        let touchStartY = 0;
-        let touchStartScrollTop = 0;
-
-        const handleWheel = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            scrollContainer.scrollTop += e.deltaY;
-        };
-
-        const handleTouchStart = (e) => {
-            touchStartY = e.touches[0].clientY;
-            touchStartScrollTop = scrollContainer.scrollTop;
-        };
-
-        const handleTouchMove = (e) => {
-            const touchY = e.touches[0].clientY;
-            const deltaY = touchStartY - touchY;
-            scrollContainer.scrollTop = touchStartScrollTop + deltaY;
-            e.preventDefault();
-        };
-
-        moduleElement.addEventListener('wheel', handleWheel, { passive: false });
-        moduleElement.addEventListener('touchstart', handleTouchStart, { passive: true });
-        moduleElement.addEventListener('touchmove', handleTouchMove, { passive: false });
-
-        return () => {
-            moduleElement.removeEventListener('wheel', handleWheel);
-            moduleElement.removeEventListener('touchstart', handleTouchStart);
-            moduleElement.removeEventListener('touchmove', handleTouchMove);
-        };
-    }, []);
-
-    // Refresh data when waking from sleep
-    useEffect(() => {
-        const handleWakeFromSleep = () => {
-            refresh();
-        };
-
-        window.addEventListener('wakeFromSleep', handleWakeFromSleep);
-
-        return () => {
-            window.removeEventListener('wakeFromSleep', handleWakeFromSleep);
-        };
-    }, [refresh]);
-
-    // Determine if Loop should be first based on day of week
-    const isLoopFirst = useMemo(() => {
-        const day = new Date().getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-        // Monday-Thursday (1-4): Loop first
-        // Friday-Sunday (5, 6, 0): Kimball first
-        return day >= 1 && day <= 4;
-    }, []);
-
-    // Group arrivals by destination/direction and sort by arrival time
-    const groupedArrivals = useMemo(() => {
-        const groups = {};
-        // Use displayedArrivals instead of raw arrivals
-        displayedArrivals.forEach(train => {
-            const key = train.stpDe || train.destNm;
-            if (!groups[key]) {
-                groups[key] = [];
-            }
-            groups[key].push(train);
-        });
-        // Sort each group by arrival time (soonest first)
-        Object.keys(groups).forEach(key => {
-            groups[key].sort((a, b) => new Date(a.arrT) - new Date(b.arrT));
-        });
-        return groups;
-    }, [displayedArrivals]);
-
-    // Sort direction groups based on day of week
-    const sortedDirections = useMemo(() => {
-        const entries = Object.entries(groupedArrivals);
-        return entries.sort((a, b) => {
-            const aIsLoop = a[0].toLowerCase().includes('loop');
-            const bIsLoop = b[0].toLowerCase().includes('loop');
-
-            if (isLoopFirst) {
-                // Loop should be first (Mon-Thu)
-                if (aIsLoop && !bIsLoop) return -1;
-                if (!aIsLoop && bIsLoop) return 1;
-            } else {
-                // Kimball should be first (Fri-Sun)
-                if (aIsLoop && !bIsLoop) return 1;
-                if (!aIsLoop && bIsLoop) return -1;
-            }
-            return 0;
-        });
-    }, [groupedArrivals, isLoopFirst]);
-
-    const toggleDirectionExpanded = (direction) => {
-        setExpandedDirections((prev) => {
-            const next = new Set(prev);
-            if (next.has(direction)) next.delete(direction);
-            else next.add(direction);
-            return next;
-        });
-    };
-
-    // Helper to format time
-    const formatTime = (dateString) => {
-        const date = new Date(dateString);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    // Helper for line color
-    const getLineColor = (route) => {
-        const colors = {
-            'Red': 'bg-red-600',
-            'Blue': 'bg-blue-600',
-            'Brn': 'bg-yellow-700',
-            'G': 'bg-green-600',
-            'Org': 'bg-orange-600',
-            'P': 'bg-purple-600',
-            'Pink': 'bg-pink-500',
-            'Y': 'bg-yellow-400',
-        };
-        return colors[route] || 'bg-gray-600';
-    };
-
-    if (loading && arrivals.length === 0) {
-        return (
-            <div className={`h-full w-full flex items-center justify-center ${moduleCard} p-6 animate-pulse`}>
-                <div className={`${theme.textAccent} font-medium`}>Loading Train Data...</div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className={`h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl ring-1 ring-red-500/30 p-6`}>
-                <div className="text-red-400 font-bold mb-2">Connection Error</div>
-                <div className="text-sm text-red-300 text-center mb-4">{error}</div>
-                <button
-                    onClick={refresh}
-                    className="px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 rounded-lg transition-colors"
-                >
-                    Retry
-                </button>
-            </div>
-        );
-    }
-
-    return (
-        <div ref={moduleRef} className={`h-full w-full min-w-0 ${moduleCard} p-3 flex flex-col relative overflow-hidden`}>
-
-            <div className="flex justify-between items-center mb-2 gap-3">
-                <h2 className={`min-w-0 text-base md:text-lg font-bold ${theme.textPrimary} flex items-center gap-2`}>
-                    <span className={`w-1.5 h-6 ${theme.accentColor} rounded-full`}></span>
-                    <span className="truncate">{stationName || 'Trains'}</span>
-                </h2>
-                <div className="flex items-center -space-x-1 flex-shrink-0">
-                    {lastUpdated && (
-                        <span className={`text-[10px] ${theme.textSecondary} whitespace-nowrap hidden md:block mr-1`}>
-                            Updated {lastUpdated.toLocaleTimeString()}
-                        </span>
-                    )}
-
-                    {/* Pause/Play Button */}
-                    <button
-                        onClick={togglePause}
-                        className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${isPaused ? 'text-yellow-400' : `${theme.textSecondary} ${theme.textAccent}`}`}
-                        title={isPaused ? "Resume Updates" : "Pause Updates"}
-                        aria-label={isPaused ? "Resume Updates" : "Pause Updates"}
-                    >
-                        {isPaused ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                            </svg>
-                        ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                            </svg>
-                        )}
-                    </button>
-
-                    <button
-                        onClick={refresh}
-                        disabled={loading || isPaused}
-                        className={`p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : `hover:${theme.textAccent}`}`}
-                        title="Refresh Data"
-                        aria-label="Refresh Train Data"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${theme.textSecondary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
-
-            {/* Inset scroll area so the scrollbar is not flush against the module edge */}
-            <div className="flex-grow min-h-0 pr-3">
-                <div
-                    ref={scrollContainerRef}
-                    className="h-full overflow-y-auto overflow-x-hidden space-y-3 custom-scrollbar pr-2 pb-6 train-scroll-mask"
-                >
-                    {sortedDirections.length === 0 ? (
-                        <div className={`text-center ${theme.textSecondary} mt-10`}>No trains scheduled</div>
-                    ) : (
-                    sortedDirections.map(([direction, trains], directionIndex) => (
-                            <div key={direction}>
-                                <button
-                                    type="button"
-                                    onClick={() => toggleDirectionExpanded(direction)}
-                                    className={`w-full flex items-center justify-between gap-2 mb-2 border-b ${theme.border} pb-1 text-left ${theme.moduleHover} rounded-lg px-2 -mx-2 transition-colors`}
-                                    aria-label={`${expandedDirections.has(direction) ? 'Collapse' : 'Expand'} ${direction}`}
-                                    title={expandedDirections.has(direction) ? 'Show fewer trains' : 'Show more trains'}
-                                >
-                                    <h3 className={`min-w-0 text-xs font-medium ${theme.textSecondary} uppercase tracking-wider truncate`}>
-                                        {direction}
-                                    </h3>
-                                    <span className="flex-shrink-0 p-1.5 rounded-full">
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            className={`h-4 w-4 ${theme.textSecondary} transition-transform ${expandedDirections.has(direction) ? 'rotate-180' : ''}`}
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                        >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </span>
-                                </button>
-                                <div className="space-y-2 relative">
-                                    {(() => {
-                                        const defaultCount = directionIndex === 0 ? 3 : 2;
-                                        const count = expandedDirections.has(direction) ? defaultCount + 2 : defaultCount;
-                                        return trains.slice(0, count).map((train) => {
-                                        const mins = getMinutes(train.arrT);
-                                        const isDue = mins === 'Due';
-                                        const isExiting = exitingTrainIds.has(train.rn);
-
-                                        return (
-                                            <div
-                                                key={train.rn}
-                                                className={`flex items-center justify-between ${moduleCardInner} px-2 py-1 rounded-xl ${theme.moduleHover} ring-1 ring-white/10 transition-all duration-1000 group ${isExiting ? 'opacity-0 translate-x-full' : 'opacity-100 translate-x-0'}`}
-                                            >
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    {/* Line Color Badge (No Text) */}
-                                                    <div className={`w-2 h-4 rounded-full ${getLineColor(train.rt)} shadow-lg group-hover:scale-110 transition-transform`}></div>
-
-                                                    <div className="min-w-0">
-                                                        <div className={`font-bold ${theme.textPrimary} text-sm leading-tight truncate`}>{train.destNm}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <div className={`text-base font-bold ${isDue ? 'text-yellow-400 animate-pulse' : theme.textPrimary}`}>
-                                                        {isDue ? 'Due' : mins}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                        });
-                                    })()}
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
-        </div>
+    const entries = [...byDirection.entries()];
+    entries.forEach(([, trains]) =>
+      trains.sort((a, b) => new Date(a.arrT) - new Date(b.arrT))
     );
+
+    return entries.sort((a, b) => {
+      const aLoop = a[0].toLowerCase().includes('loop');
+      const bLoop = b[0].toLowerCase().includes('loop');
+      if (aLoop === bLoop) return 0;
+      if (loopFirst) return aLoop ? -1 : 1;
+      return aLoop ? 1 : -1;
+    });
+  }, [arrivals, loopFirst]);
+
+  const toggle = (direction) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(direction)) next.delete(direction);
+      else next.add(direction);
+      return next;
+    });
+
+  if (loading && arrivals.length === 0) {
+    return (
+      <div className="card flex h-full w-full items-center justify-center">
+        <div className="text-base font-medium text-fg-muted">Loading arrivals…</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="card flex h-full w-full flex-col items-center justify-center gap-4 p-6">
+        <WarningIcon className="h-9 w-9 text-danger" />
+        <div className="text-center">
+          <div className="text-base font-semibold text-fg">Arrivals unavailable</div>
+          <div className="mt-1 text-sm text-fg-muted">{error}</div>
+        </div>
+        <button type="button" onClick={refresh} className="btn">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+        <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
+          <TrainIcon className="h-6 w-6 shrink-0 text-accent" />
+          <span className="truncate">{stationName || 'Arrivals'}</span>
+        </h2>
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          {stale ? (
+            <span className="text-warning" title="Showing last known arrivals">
+              <WarningIcon className="h-4 w-4" />
+            </span>
+          ) : (
+            lastUpdated && (
+              <span className="nums mr-1 hidden text-xs text-fg-faint md:block">
+                {lastUpdated.toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </span>
+            )
+          )}
+
+          <button
+            type="button"
+            onClick={togglePause}
+            className="icon-btn"
+            data-state={isPaused ? 'on' : 'off'}
+            aria-label={isPaused ? 'Resume updates' : 'Pause updates'}
+          >
+            {isPaused ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={loading || isPaused}
+            className="icon-btn"
+            aria-label="Refresh arrivals"
+          >
+            <RefreshIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Native scrolling — the previous version reimplemented touch scrolling
+          with preventDefault + manual scrollTop, which threw away momentum and
+          rubber-banding and made the list feel dead under a finger. */}
+      <div className="scroll-y train-scroll-mask min-h-0 flex-1 pr-1">
+        {groups.length === 0 ? (
+          <div className="mt-12 text-center text-base text-fg-muted">
+            No trains scheduled
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {groups.map(([direction, trains]) => {
+              const isOpen = expanded.has(direction);
+              const limit = isOpen ? EXPANDED_ROWS : COLLAPSED_ROWS;
+              const hasMore = trains.length > COLLAPSED_ROWS;
+
+              return (
+                <div key={direction}>
+                  <button
+                    type="button"
+                    onClick={() => hasMore && toggle(direction)}
+                    disabled={!hasMore}
+                    className="mb-2 flex min-h-[44px] w-full items-center justify-between gap-2 rounded-xl px-1 text-left disabled:cursor-default"
+                    aria-expanded={isOpen}
+                    aria-label={`${isOpen ? 'Show fewer' : 'Show more'} trains toward ${direction}`}
+                  >
+                    <span className="eyebrow min-w-0 truncate">{direction}</span>
+                    {hasMore && (
+                      <ChevronDownIcon
+                        className={`h-5 w-5 shrink-0 text-fg-faint transition-transform duration-200 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    )}
+                  </button>
+
+                  <div className="space-y-2">
+                    {trains.slice(0, limit).map((train) => {
+                      const mins = minutesUntil(train.arrT);
+                      const isDue = mins === null;
+                      const isApproaching = mins !== null && mins <= 2;
+
+                      return (
+                        <div
+                          key={train.rn}
+                          className="card-inset card-inset-hover flex items-center justify-between gap-3 px-3 py-2.5"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span
+                              className="h-7 w-1.5 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor:
+                                  LINE_COLORS[train.rt] || 'var(--fg-faint)',
+                              }}
+                            />
+                            <span className="truncate text-base font-semibold text-fg">
+                              {train.destNm}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`nums shrink-0 text-right text-xl font-semibold ${
+                              isDue || isApproaching ? 'text-accent' : 'text-fg'
+                            }`}
+                          >
+                            {isDue ? (
+                              'Due'
+                            ) : (
+                              <>
+                                {mins}
+                                <span className="ml-1 text-sm font-medium text-fg-muted">
+                                  min
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 export default TrainModule;

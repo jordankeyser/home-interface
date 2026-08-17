@@ -1,255 +1,364 @@
-import React, { useState, useEffect } from 'react';
-import { useSettings } from '../context/SettingsContext';
+import { useState } from 'react';
+import { useSettings } from '../hooks/useSettings';
+import { useDisplay } from '../hooks/useDisplay';
 import { themes } from '../config/themes';
+import { PROVIDERS } from '../lib/stockProviders';
+import { shutdownHost, rebootHost } from '../lib/displayApi';
+import ConfirmDialog from './ConfirmDialog';
+import {
+  CloseIcon,
+  CheckIcon,
+  EyeIcon,
+  EyeOffIcon,
+  MoonIcon,
+  PowerIcon,
+  RefreshIcon,
+} from './icons';
 
-const SettingsModal = ({ isOpen, onClose }) => {
-    const { settings, updateSettings } = useSettings();
-    const [formData, setFormData] = useState(settings);
-    const [showKeys, setShowKeys] = useState({
-        ctaApiKey: false,
-        ctaStationId: false,
-        zipCode: false,
-        stockApiKey: false
-    });
+const SecretField =({ label, name, value, onChange, placeholder, hint }) => {
+  const [visible, setVisible] = useState(false);
 
-    useEffect(() => {
-        if (isOpen) {
-            setFormData(settings);
-            setShowKeys({ ctaApiKey: false, ctaStationId: false, zipCode: false, stockApiKey: false });
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen]);
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const toggleShowKey = (key) => {
-        setShowKeys(prev => ({ ...prev, [key]: !prev[key] }));
-    };
-
-    const handleSubmit = () => {
-        updateSettings(formData);
-        onClose();
-    };
-
-    const handleSleep = () => {
-        fetch('http://localhost:3001/display/off', { method: 'POST' }).catch(() => {});
-        window.dispatchEvent(new CustomEvent('enterSleepMode'));
-        onClose();
-    };
-
-    const handleQuit = () => {
-        if (window.confirm('Are you sure you want to quit the dashboard?')) {
-            window.dispatchEvent(new CustomEvent('quitDashboard'));
-            onClose();
-        }
-    };
-
-    const handleShutdown = async () => {
-        if (window.confirm('Are you sure you want to shutdown the Raspberry Pi?')) {
-            try {
-                await fetch('http://localhost:3001/shutdown', { method: 'POST' });
-            } catch (error) {
-                console.error('Shutdown failed:', error);
-                alert('Failed to shutdown.');
-            }
-            onClose();
-        }
-    };
-
-    const EyeIcon = ({ show, onClick }) => (
+  return (
+    <div>
+      <label className="label" htmlFor={name}>
+        {label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id={name}
+          type={visible ? 'text' : 'password'}
+          name={name}
+          value={value || ''}
+          onChange={onChange}
+          className="field"
+          placeholder={placeholder}
+          autoComplete="off"
+          spellCheck={false}
+        />
         <button
-            type="button"
-            onClick={onClick}
-            className="p-1 text-gray-500 hover:text-gray-300 transition-colors touch-manipulation"
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          className="icon-btn shrink-0"
+          aria-label={visible ? `Hide ${label}` : `Show ${label}`}
         >
-            {show ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-            ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-            )}
+          {visible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
         </button>
-    );
+      </div>
+      {hint && <p className="mt-1.5 text-xs text-fg-faint">{hint}</p>}
+    </div>
+  );
+};
 
-    if (!isOpen) return null;
+const Field = ({ label, name, value, onChange, placeholder, hint, ...rest }) => (
+  <div>
+    <label className="label" htmlFor={name}>
+      {label}
+    </label>
+    <input
+      id={name}
+      type="text"
+      name={name}
+      value={value || ''}
+      onChange={onChange}
+      className="field"
+      placeholder={placeholder}
+      autoComplete="off"
+      spellCheck={false}
+      {...rest}
+    />
+    {hint && <p className="mt-1.5 text-xs text-fg-faint">{hint}</p>}
+  </div>
+);
 
-    return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-gray-900">
-            {/* Header */}
-            <div className="flex-shrink-0 p-2 border-b border-gray-700 flex items-center justify-between">
-                <h2 className="text-base font-bold text-white">Settings</h2>
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-3 py-1.5 rounded text-gray-300 hover:bg-gray-700 transition-colors touch-manipulation text-sm"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSubmit}
-                        className="px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-500 transition-colors font-medium touch-manipulation text-sm"
-                    >
-                        Save
-                    </button>
-                </div>
-            </div>
+const Toggle = ({ label, hint, checked, onChange }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onChange(!checked)}
+    className="card-inset flex min-h-[56px] w-full items-center justify-between gap-4 px-4 py-3 text-left"
+  >
+    <span className="min-w-0">
+      <span className="block text-sm font-medium text-fg">{label}</span>
+      {hint && <span className="mt-0.5 block text-xs text-fg-faint">{hint}</span>}
+    </span>
+    <span
+      className="relative h-7 w-12 shrink-0 rounded-full transition-colors duration-200"
+      style={{ backgroundColor: checked ? 'var(--accent)' : 'var(--line-strong)' }}
+    >
+      <span
+        className="absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all duration-200"
+        style={{ left: checked ? '1.625rem' : '0.25rem' }}
+      />
+    </span>
+  </button>
+);
 
-            {/* Main Content Grid */}
-            <div className="flex-1 p-2">
-                <div className="grid grid-cols-2 gap-2 h-full">
+const Section = ({ title, children }) => (
+  <section className="card-inset p-4">
+    <h3 className="eyebrow mb-3">{title}</h3>
+    <div className="space-y-3">{children}</div>
+  </section>
+);
 
-                    {/* Left Column - Configuration */}
-                    <div className="bg-gray-800 rounded-lg p-2">
-                        <h3 className="text-xs font-semibold text-gray-400 mb-2">Configuration</h3>
-                        <div className="space-y-2">
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-0.5">CTA API Key</label>
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type={showKeys.ctaApiKey ? 'text' : 'password'}
-                                        name="ctaApiKey"
-                                        value={formData.ctaApiKey || ''}
-                                        onChange={handleChange}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        placeholder="API Key"
-                                    />
-                                    <EyeIcon show={showKeys.ctaApiKey} onClick={() => toggleShowKey('ctaApiKey')} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-0.5">Station ID</label>
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type={showKeys.ctaStationId ? 'text' : 'password'}
-                                        name="ctaStationId"
-                                        value={formData.ctaStationId || ''}
-                                        onChange={handleChange}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        placeholder="e.g., 40380"
-                                    />
-                                    <EyeIcon show={showKeys.ctaStationId} onClick={() => toggleShowKey('ctaStationId')} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-0.5">Zip Code</label>
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type={showKeys.zipCode ? 'text' : 'password'}
-                                        name="zipCode"
-                                        value={formData.zipCode || ''}
-                                        onChange={handleChange}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        placeholder="e.g., 60601"
-                                        maxLength={5}
-                                    />
-                                    <EyeIcon show={showKeys.zipCode} onClick={() => toggleShowKey('zipCode')} />
-                                </div>
-                            </div>
+const SettingsModal = ({ onClose }) => {
+  const { settings, updateSettings } = useSettings();
+  const { sleep } = useDisplay();
 
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-0.5">Stock API Key (Alpha Vantage)</label>
-                                <div className="flex items-center gap-1">
-                                    <input
-                                        type={showKeys.stockApiKey ? 'text' : 'password'}
-                                        name="stockApiKey"
-                                        value={formData.stockApiKey || ''}
-                                        onChange={handleChange}
-                                        className="flex-1 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        placeholder="Optional (required to fetch quotes)"
-                                    />
-                                    <EyeIcon show={showKeys.stockApiKey} onClick={() => toggleShowKey('stockApiKey')} />
-                                </div>
-                                <div className="text-[10px] text-gray-500 mt-0.5">
-                                    Uses Alpha Vantage GLOBAL_QUOTE. Free tier is rate-limited, so quotes refresh gradually.
-                                </div>
-                            </div>
+  // Mounted only while open (see Layout), so plain lazy init is enough — no
+  // setState-in-effect sync needed.
+  const [form, setForm] = useState(settings);
+  const [confirm, setConfirm] = useState(null);
 
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-0.5">Stock Symbols</label>
-                                <input
-                                    type="text"
-                                    name="stockSymbols"
-                                    value={formData.stockSymbols || ''}
-                                    onChange={handleChange}
-                                    className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-white text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    placeholder="e.g., AAPL, MSFT, TSLA"
-                                />
-                                <div className="text-[10px] text-gray-500 mt-0.5">
-                                    Comma-separated tickers. The module will auto-scroll continuously.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-                    {/* Right Column - Power & Theme */}
-                    <div className="bg-gray-800 rounded-lg p-2 flex flex-col">
-                        <h3 className="text-xs font-semibold text-gray-400 mb-2">Power</h3>
-                        <div className="grid grid-cols-3 gap-1.5 mb-3">
-                            <button
-                                type="button"
-                                onClick={handleSleep}
-                                className="px-2 py-2 rounded bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 transition-colors font-medium touch-manipulation flex flex-col items-center justify-center gap-1 text-xs"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                                </svg>
-                                Sleep
-                            </button>
+  const set = (partial) => setForm((prev) => ({ ...prev, ...partial }));
 
-                            <button
-                                type="button"
-                                onClick={handleQuit}
-                                className="px-2 py-2 rounded bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-300 transition-colors font-medium touch-manipulation flex flex-col items-center justify-center gap-1 text-xs"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                                Quit
-                            </button>
+  const handleSave = () => {
+    updateSettings(form);
+    onClose();
+  };
 
-                            <button
-                                type="button"
-                                onClick={handleShutdown}
-                                className="px-2 py-2 rounded bg-red-600/20 hover:bg-red-600/30 text-red-300 transition-colors font-medium touch-manipulation flex flex-col items-center justify-center gap-1 text-xs"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 11-12.728 0M12 3v9" />
-                                </svg>
-                                Shutdown
-                            </button>
-                        </div>
+  const provider = PROVIDERS[form.stockProvider] || PROVIDERS.finnhub;
 
-                        <h3 className="text-xs font-semibold text-gray-400 mb-2">Theme</h3>
-                        <div className="grid grid-cols-2 gap-1.5 flex-1">
-                            {Object.values(themes).map((theme) => (
-                                <button
-                                    key={theme.id}
-                                    type="button"
-                                    onClick={() => setFormData(prev => ({ ...prev, theme: theme.id }))}
-                                    className={`px-2 py-1.5 rounded text-xs font-medium touch-manipulation transition-all ${
-                                        formData.theme === theme.id
-                                            ? 'bg-blue-600 text-white ring-1 ring-blue-400'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    {theme.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-canvas">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-3">
+        <h2 className="text-xl font-semibold text-fg">Settings</h2>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onClose} className="btn">
+            <CloseIcon className="h-5 w-5" />
+            Cancel
+          </button>
+          <button type="button" onClick={handleSave} className="btn btn-primary">
+            <CheckIcon className="h-5 w-5" />
+            Save
+          </button>
         </div>
-    );
+      </header>
+
+      <div className="scroll-y min-h-0 flex-1 p-4">
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
+            <Section title="Transit">
+              <SecretField
+                label="CTA API key"
+                name="ctaApiKey"
+                value={form.ctaApiKey}
+                onChange={handleChange}
+                placeholder="Train Tracker API key"
+                hint="Request one at transitchicago.com/developers"
+              />
+              <Field
+                label="Station ID"
+                name="ctaStationId"
+                value={form.ctaStationId}
+                onChange={handleChange}
+                placeholder="40380"
+                inputMode="numeric"
+                hint="5-digit station MapID"
+              />
+            </Section>
+
+            <Section title="Weather">
+              <Field
+                label="Zip code"
+                name="zipCode"
+                value={form.zipCode}
+                onChange={handleChange}
+                placeholder="60601"
+                inputMode="numeric"
+                maxLength={5}
+                hint="No API key needed — powered by Open-Meteo"
+              />
+            </Section>
+
+            <Section title="Markets">
+              <div>
+                <span className="label">Quote provider</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.values(PROVIDERS).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => set({ stockProvider: p.id })}
+                      className="btn"
+                      style={
+                        form.stockProvider === p.id
+                          ? {
+                              backgroundColor: 'var(--accent)',
+                              color: 'var(--accent-fg)',
+                              borderColor: 'transparent',
+                            }
+                          : undefined
+                      }
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-fg-faint">{provider.hint}</p>
+              </div>
+
+              <SecretField
+                label={`${provider.name} API key`}
+                name="stockApiKey"
+                value={form.stockApiKey}
+                onChange={handleChange}
+                placeholder="Required to load quotes"
+                hint={`Get a free key at ${provider.keyUrl}`}
+              />
+
+              <Field
+                label="Symbols"
+                name="stockSymbols"
+                value={form.stockSymbols}
+                onChange={handleChange}
+                placeholder="AAPL, MSFT, TSLA"
+                hint="Comma-separated, up to 12 tickers"
+              />
+            </Section>
+          </div>
+
+          <div className="space-y-4">
+            <Section title="Appearance">
+              <div className="grid grid-cols-2 gap-2">
+                {themes.map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => set({ theme: theme.id })}
+                    className="btn"
+                    style={
+                      form.theme === theme.id
+                        ? {
+                            backgroundColor: 'var(--accent)',
+                            color: 'var(--accent-fg)',
+                            borderColor: 'transparent',
+                          }
+                        : undefined
+                    }
+                  >
+                    {theme.name}
+                  </button>
+                ))}
+              </div>
+
+              <Toggle
+                label="Simulate 7-inch panel"
+                hint="Frames the view at 1024x600 for desktop testing"
+                checked={Boolean(form.isPiMode)}
+                onChange={(v) => set({ isPiMode: v })}
+              />
+            </Section>
+
+            <Section title="Display">
+              <Toggle
+                label="Ambient dimming"
+                hint="Lowers the backlight in the evening and overnight"
+                checked={form.ambientDimming !== false}
+                onChange={(v) => set({ ambientDimming: v })}
+              />
+
+              <div>
+                <span className="label">Sleep after inactivity</span>
+                <div className="grid grid-cols-4 gap-2">
+                  {[0, 3, 10, 30].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => set({ idleSleepMinutes: mins })}
+                      className="btn"
+                      style={
+                        Number(form.idleSleepMinutes) === mins
+                          ? {
+                              backgroundColor: 'var(--accent)',
+                              color: 'var(--accent-fg)',
+                              borderColor: 'transparent',
+                            }
+                          : undefined
+                      }
+                    >
+                      {mins === 0 ? 'Never' : `${mins}m`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Section>
+
+            <Section title="Power">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sleep();
+                    onClose();
+                  }}
+                  className="btn flex-col gap-1 py-3"
+                >
+                  <MoonIcon className="h-5 w-5" />
+                  <span className="text-xs">Sleep</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfirm({
+                      title: 'Restart the Pi?',
+                      message: 'The panel will be dark for about a minute.',
+                      confirmLabel: 'Restart',
+                      action: rebootHost,
+                    })
+                  }
+                  className="btn flex-col gap-1 py-3"
+                >
+                  <RefreshIcon className="h-5 w-5" />
+                  <span className="text-xs">Restart</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setConfirm({
+                      title: 'Shut down the Pi?',
+                      message:
+                        'You will need to physically power-cycle it to turn it back on.',
+                      confirmLabel: 'Shut down',
+                      destructive: true,
+                      action: shutdownHost,
+                    })
+                  }
+                  className="btn flex-col gap-1 py-3"
+                  style={{ color: 'var(--danger)' }}
+                >
+                  <PowerIcon className="h-5 w-5" />
+                  <span className="text-xs">Shut down</span>
+                </button>
+              </div>
+            </Section>
+          </div>
+        </div>
+      </div>
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          message={confirm.message}
+          confirmLabel={confirm.confirmLabel}
+          destructive={confirm.destructive}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => {
+            confirm.action?.();
+            setConfirm(null);
+            onClose();
+          }}
+        />
+      )}
+    </div>
+  );
 };
 
 export default SettingsModal;

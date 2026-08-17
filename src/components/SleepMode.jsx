@@ -1,130 +1,118 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { DisplayContext } from '../context/displayStore';
+import { useSettings } from '../hooks/useSettings';
+import {
+  displayOff,
+  displayOn,
+  setBrightness,
+  ambientBrightness,
+} from '../lib/displayApi';
 
-// Control the physical display power via the display server
-const turnDisplayOff = () => {
-    fetch('http://localhost:3001/display/off', { method: 'POST' }).catch(() => {});
-};
+const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart'];
 
-const turnDisplayOn = () => {
-    fetch('http://localhost:3001/display/on', { method: 'POST' }).catch(() => {});
-};
-
+/**
+ * Idle sleep + ambient dimming.
+ *
+ * Children stay mounted at all times and sleep renders as an overlay on top.
+ * The previous version returned a bare <div> instead of `children`, which
+ * unmounted the entire dashboard — that made the `wakeFromSleep` listeners in
+ * every module dead code, and meant each wake showed loading spinners and a
+ * layout flash while everything remounted and refetched.
+ */
 const SleepMode = ({ children }) => {
-    const [isSleeping, setIsSleeping] = useState(false); // Start awake; sleep after inactivity or via Settings
-    const [isQuitting, setIsQuitting] = useState(false);
-    const timeoutRef = useRef(null);
-    const IDLE_TIMEOUT = 3 * 60 * 1000; // 3 minutes in milliseconds
+  const { settings } = useSettings();
+  const [isAsleep, setIsAsleep] = useState(false);
+  const timerRef = useRef(null);
+  const brightnessRef = useRef(null);
 
-    const resetIdleTimer = useCallback(() => {
-        if (isQuitting) return;
+  const idleMs = Math.max(0, Number(settings.idleSleepMinutes) || 0) * 60_000;
+  const ambientDimming = settings.ambientDimming !== false;
 
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
+  const sleep = useCallback(() => {
+    setIsAsleep((asleep) => {
+      if (!asleep) displayOff();
+      return true;
+    });
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
-        // Set timeout to go to sleep after 3 minutes of inactivity
-        timeoutRef.current = setTimeout(() => {
-            setIsSleeping(true);
-            turnDisplayOff();
-        }, IDLE_TIMEOUT);
-    }, [isQuitting, IDLE_TIMEOUT]);
+  const wake = useCallback(() => {
+    setIsAsleep((asleep) => {
+      if (asleep) {
+        displayOn();
+        if (ambientDimming) setBrightness(ambientBrightness());
+      }
+      return false;
+    });
+  }, [ambientDimming]);
 
-    const wakeUp = useCallback(() => {
-        turnDisplayOn();
-        setIsSleeping(false);
-        resetIdleTimer();
+  // Idle countdown. Rearmed by any activity, and by waking.
+  useEffect(() => {
+    if (idleMs === 0 || isAsleep) return undefined;
 
-        // Dispatch a custom event to refresh all data when waking up
-        window.dispatchEvent(new CustomEvent('wakeFromSleep'));
-    }, [resetIdleTimer]);
-
-    const handleSleepMode = useCallback(() => {
-        setIsSleeping(true);
-        turnDisplayOff();
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
-    }, []);
-
-    const handleQuit = useCallback(() => {
-        setIsQuitting(true);
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-        }
-    }, []);
-
-    const handleRestart = () => {
-        setIsQuitting(false);
-        setIsSleeping(false);
-        resetIdleTimer();
+    const arm = () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(sleep, idleMs);
     };
 
-    useEffect(() => {
-        // Set up event listeners for sleep and quit
-        window.addEventListener('enterSleepMode', handleSleepMode);
-        window.addEventListener('quitDashboard', handleQuit);
+    arm();
+    ACTIVITY_EVENTS.forEach((e) =>
+      document.addEventListener(e, arm, { passive: true, capture: true })
+    );
 
-        // Set up activity listeners for idle timeout
-        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      ACTIVITY_EVENTS.forEach((e) =>
+        document.removeEventListener(e, arm, { capture: true })
+      );
+    };
+  }, [idleMs, isAsleep, sleep]);
 
-        events.forEach(event => {
-            document.addEventListener(event, resetIdleTimer, true);
-        });
+  // Ambient dimming: follow a day/night curve while awake. The backlight server
+  // takes any 0–100 value, but the old client only ever sent full-on or off.
+  useEffect(() => {
+    if (!ambientDimming || isAsleep) return undefined;
 
-        // Ensure the physical display is on when we start awake
-        if (!isSleeping) {
-            turnDisplayOn();
-        }
+    const apply = () => {
+      const next = Math.round(ambientBrightness());
+      if (brightnessRef.current === next) return;
+      brightnessRef.current = next;
+      setBrightness(next);
+    };
 
-        // Start idle timer immediately on load
-        resetIdleTimer();
+    apply();
+    const id = setInterval(apply, 60_000);
+    return () => clearInterval(id);
+  }, [ambientDimming, isAsleep]);
 
-        // Cleanup
-        return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
-            window.removeEventListener('enterSleepMode', handleSleepMode);
-            window.removeEventListener('quitDashboard', handleQuit);
-            events.forEach(event => {
-                document.removeEventListener(event, resetIdleTimer, true);
-            });
-        };
-    }, [resetIdleTimer, handleSleepMode, handleQuit, isSleeping]);
+  // Ensure the panel is lit on first load.
+  useEffect(() => {
+    displayOn();
+  }, []);
 
-    if (isQuitting) {
-        return (
-            <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-slate-800 to-black flex items-center justify-center">
-                <div className="text-center p-8">
-                    <div className="mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                    <h1 className="text-4xl font-bold text-white mb-4">Dashboard Closed</h1>
-                    <p className="text-xl text-gray-400 mb-8">Click the button below to restart the dashboard</p>
-                    <button
-                        onClick={handleRestart}
-                        className="px-8 py-4 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-xl font-semibold text-lg transition-colors shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 touch-manipulation min-h-[56px]"
-                    >
-                        Restart Dashboard
-                    </button>
-                </div>
-            </div>
-        );
-    }
+  // Allow other components (Settings "Sleep" button) to trigger sleep.
+  useEffect(() => {
+    const onSleep = () => sleep();
+    window.addEventListener('enterSleepMode', onSleep);
+    return () => window.removeEventListener('enterSleepMode', onSleep);
+  }, [sleep]);
 
-    if (isSleeping) {
-        return (
-            <div
-                className="min-h-screen w-full cursor-pointer sleep-mode-screen"
-                onClick={wakeUp}
-                onTouchStart={wakeUp}
-            />
-        );
-    }
+  const value = useMemo(() => ({ isAsleep, sleep, wake }), [isAsleep, sleep, wake]);
 
-    return <>{children}</>;
+  return (
+    <DisplayContext.Provider value={value}>
+      {children}
+
+      {isAsleep && (
+        <button
+          type="button"
+          onPointerDown={wake}
+          className="fixed inset-0 z-[100] h-full w-full cursor-pointer bg-black"
+          aria-label="Wake display"
+        />
+      )}
+    </DisplayContext.Provider>
+  );
 };
 
 export default SleepMode;

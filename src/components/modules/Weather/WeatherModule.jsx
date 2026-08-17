@@ -1,267 +1,177 @@
-import React, { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useWeather } from '../../../hooks/useWeather';
-import { useSettings } from '../../../context/SettingsContext';
+import WeatherBackdrop from './WeatherBackdrop';
+import {
+  RefreshIcon,
+  WindIcon,
+  HumidityIcon,
+  PrecipIcon,
+  WarningIcon,
+} from '../../icons';
+import WeatherGlyph from './WeatherGlyph';
+import { weatherLabel } from '../../../lib/weatherCodes';
+
+const Stat = ({ icon: Icon, label, value, unit }) => (
+  <div className="flex flex-1 flex-col items-center gap-1">
+    <Icon className="h-5 w-5 text-fg-faint" />
+    <div className="nums text-base font-semibold text-fg">
+      {value}
+      {unit && <span className="ml-0.5 text-xs font-normal text-fg-muted">{unit}</span>}
+    </div>
+    <div className="text-xs font-medium text-fg-faint">{label}</div>
+  </div>
+);
 
 const WeatherModule = () => {
-    const { weather, locationName, loading, error, refresh } = useWeather();
-    const { settings, currentTheme } = useSettings();
-    const isPiMode = settings.isPiMode;
-    const theme = currentTheme.colors;
-    const moduleCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-2xl rounded-3xl`;
-    const forecastRef = React.useRef(null);
-    const forecastContainerRef = React.useRef(null);
+  const { weather, locationName, loading, error, stale, refresh } = useWeather();
 
-    const getWeatherDescription = (code) => {
-        const codes = {
-            0: 'Clear Sky',
-            1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
-            45: 'Fog', 48: 'Depositing Rime Fog',
-            51: 'Light Drizzle', 53: 'Moderate Drizzle', 55: 'Dense Drizzle',
-            61: 'Slight Rain', 63: 'Moderate Rain', 65: 'Heavy Rain',
-            71: 'Slight Snow', 73: 'Moderate Snow', 75: 'Heavy Snow',
-            95: 'Thunderstorm', 96: 'Thunderstorm with Hail', 99: 'Heavy Thunderstorm'
-        };
-        return codes[code] || 'Unknown';
-    };
+  const hourly = useMemo(() => {
+    if (!weather?.hourly?.time) return [];
 
-    const formatHour = (isoString) => {
-        const date = new Date(isoString);
-        return date.toLocaleTimeString([], { hour: 'numeric', hour12: true });
-    };
+    // Anchor on the payload's own `current.time` rather than the wall clock:
+    // both are local-timezone "YYYY-MM-DDTHH:MM" strings, so a lexicographic
+    // compare is correct, timezone-safe, and keeps this render pure.
+    const anchor = weather.current?.time ?? weather.hourly.time[0];
+    const start = weather.hourly.time.findIndex((t) => t >= anchor);
+    if (start < 0) return [];
 
-    const renderBackground = (code) => {
-        if (code === 0) {
-            return (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-[-20%] right-[-20%] w-[80%] h-[80%] bg-yellow-400/20 rounded-full blur-[100px] animate-[sun-pulse_8s_infinite]"></div>
-                    <div className="absolute top-[10%] right-[10%] text-yellow-300 text-9xl opacity-20 animate-[spin_60s_linear_infinite]">☀️</div>
-                </div>
-            );
-        }
-        if (code <= 3 || code === 45 || code === 48) {
-            return (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-[10%] left-[-20%] text-gray-400/30 text-9xl animate-[cloud-drift_20s_linear_infinite]">☁️</div>
-                    <div className="absolute top-[40%] left-[-10%] text-gray-300/20 text-8xl animate-[cloud-drift_25s_linear_infinite_reverse]">☁️</div>
-                    <div className="absolute top-[20%] left-[-40%] text-white/10 text-[10rem] animate-[cloud-drift_30s_linear_infinite]">☁️</div>
-                </div>
-            );
-        }
-        if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
-            return (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {[...Array(20)].map((_, i) => (
-                        <div
-                            key={i}
-                            className="absolute top-[-10%] text-blue-300/40 text-2xl animate-[rain-fall_2s_linear_infinite]"
-                            style={{
-                                left: `${Math.random() * 100}%`,
-                                animationDelay: `${Math.random() * 2}s`,
-                                animationDuration: `${1 + Math.random()}s`
-                            }}
-                        >
-                            💧
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-        if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
-            return (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    {[...Array(15)].map((_, i) => (
-                        <div
-                            key={i}
-                            className="absolute top-[-10%] text-white/60 text-xl animate-[snow-fall_5s_linear_infinite]"
-                            style={{
-                                left: `${Math.random() * 100}%`,
-                                animationDelay: `${Math.random() * 5}s`,
-                                animationDuration: `${3 + Math.random() * 2}s`
-                            }}
-                        >
-                            ❄️
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-        if (code >= 95) {
-            return (
-                <div className="absolute inset-0 overflow-hidden pointer-events-none bg-gray-900/40">
-                    <div className="absolute inset-0 bg-white/10 animate-[pulse_0.5s_ease-in-out_infinite]"></div>
-                    {[...Array(5)].map((_, i) => (
-                        <div
-                            key={i}
-                            className="absolute top-[-10%] text-yellow-300/40 text-4xl animate-[rain-fall_0.5s_linear_infinite]"
-                            style={{
-                                left: `${Math.random() * 100}%`,
-                                animationDelay: `${Math.random()}s`
-                            }}
-                        >
-                            ⚡
-                        </div>
-                    ))}
-                </div>
-            );
-        }
-        return null;
-    };
+    return weather.hourly.time.slice(start, start + 12).map((time, i) => ({
+      time,
+      temp: weather.hourly.temperature_2m[start + i],
+      code: weather.hourly.weather_code[start + i],
+    }));
+  }, [weather]);
 
-    const hourlyForecast = useMemo(() => {
-        if (!weather || !weather.hourly) return [];
-        const hours = [];
-        const now = new Date();
-
-        // Find the current hour or the most recent hour
-        let startIndex = -1;
-        for (let i = 0; i < weather.hourly.time.length; i++) {
-            const hourTime = new Date(weather.hourly.time[i]);
-            // Check if this hour is the current hour or the closest one before now
-            if (hourTime.getTime() <= now.getTime()) {
-                startIndex = i;
-            } else {
-                break;
-            }
-        }
-
-        // If we found a valid starting point, get the next 12 hours from there
-        if (startIndex !== -1) {
-            for (let i = 0; i < 12 && (startIndex + i) < weather.hourly.time.length; i++) {
-                const idx = startIndex + i;
-                hours.push({
-                    time: weather.hourly.time[idx],
-                    temp: weather.hourly.temperature_2m[idx],
-                    code: weather.hourly.weather_code[idx]
-                });
-            }
-        }
-
-        return hours;
-    }, [weather]);
-
-    // Enable horizontal scrolling of forecast from anywhere on the forecast area
-    useEffect(() => {
-        const forecastElement = forecastRef.current;
-        const scrollContainer = forecastContainerRef.current;
-
-        if (!forecastElement || !scrollContainer) return;
-
-        const handleWheel = (e) => {
-            // Prevent default scrolling behavior
-            e.preventDefault();
-            e.stopPropagation();
-
-            // Scroll horizontally
-            scrollContainer.scrollLeft += e.deltaY;
-        };
-
-        forecastElement.addEventListener('wheel', handleWheel, { passive: false });
-
-        return () => {
-            forecastElement.removeEventListener('wheel', handleWheel);
-        };
-    }, []);
-
-    // Refresh data when waking from sleep
-    useEffect(() => {
-        const handleWakeFromSleep = () => {
-            refresh();
-        };
-
-        window.addEventListener('wakeFromSleep', handleWakeFromSleep);
-
-        return () => {
-            window.removeEventListener('wakeFromSleep', handleWakeFromSleep);
-        };
-    }, [refresh]);
-
-    if (loading && !weather) {
-        return (
-            <div className={`h-full w-full flex items-center justify-center ${moduleCard} p-6 animate-pulse`}>
-                <div className={`${theme.textAccent} font-medium`}>Loading Weather...</div>
-            </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <div className="h-full w-full flex flex-col items-center justify-center bg-red-500/10 backdrop-blur-md rounded-3xl ring-1 ring-red-500/30 p-6">
-                <div className="text-red-400 font-bold mb-2">Weather Error</div>
-                <div className="text-sm text-red-300 text-center mb-4">{error}</div>
-                <button onClick={refresh} className="px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 rounded-lg transition-colors">Retry</button>
-            </div>
-        );
-    }
-
-    if (!weather) return null;
-
-    const current = weather.current;
-    const daily = weather.daily;
-    const bgAnimation = renderBackground(current.weather_code);
-
+  if (loading && !weather) {
     return (
-        <div className={`h-full w-full ${moduleCard} flex flex-col relative overflow-hidden`}>
-            {bgAnimation}
-
-            <div className={`flex-grow flex flex-col items-center z-10 relative ${isPiMode ? 'justify-start pt-2' : 'justify-start pt-8'}`}>
-                <div className="text-center">
-                    <h2 className={`font-light ${theme.textPrimary} opacity-80 mb-1 tracking-wide ${isPiMode ? 'text-base' : 'text-lg'}`}>{locationName}</h2>
-                    <div className={`leading-none font-bold ${theme.textPrimary} tracking-tighter drop-shadow-2xl ${isPiMode ? 'text-6xl' : 'text-7xl'}`}>
-                        {Math.round(current.temperature_2m)}°
-                    </div>
-                    <div className={`${theme.textAccent} font-medium uppercase tracking-widest ${isPiMode ? 'text-sm mt-1' : 'text-base mt-1'}`}>
-                        {getWeatherDescription(current.weather_code)}
-                    </div>
-                    <div className={`${theme.textPrimary} opacity-60 mt-1 ${isPiMode ? 'text-xs' : 'text-sm'}`}>
-                        H: {Math.round(daily.temperature_2m_max[0])}°  L: {Math.round(daily.temperature_2m_min[0])}°
-                    </div>
-                </div>
-
-                <button
-                    onClick={refresh}
-                    disabled={loading}
-                    className={`absolute top-4 right-4 p-1.5 rounded-full ${theme.moduleHover} ${theme.buttonActive} transition-all touch-manipulation min-w-[40px] min-h-[40px] flex items-center justify-center ${loading ? 'animate-spin opacity-50' : `hover:${theme.textAccent}`}`}
-                    title="Refresh Data"
-                    aria-label="Refresh Weather Data"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${theme.textSecondary}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                </button>
-            </div>
-
-            <div ref={forecastRef} className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t ${theme.bgTertiary === 'bg-gray-100' ? 'from-gray-200 via-gray-100/90' : 'from-gray-950 via-gray-900/80'} to-transparent pt-8 pb-2 px-2 z-20`}>
-                <div ref={forecastContainerRef} className="flex space-x-3 overflow-x-auto pb-2 scrollbar-hide touch-pan-x" style={{ scrollSnapType: 'x mandatory' }}>
-                    {hourlyForecast.map((hour, idx) => (
-                        <div key={idx} className="flex flex-col items-center space-y-0.5 min-w-[2rem] flex-shrink-0" style={{ scrollSnapAlign: 'start' }}>
-                            <span className={`text-[9px] ${theme.textAccent} opacity-80`}>{formatHour(hour.time)}</span>
-                            <span className="text-sm drop-shadow-md">
-                                {hour.code === 0 ? '☀️' : hour.code <= 3 ? '⛅' : hour.code <= 67 ? '🌧️' : '❄️'}
-                            </span>
-                            <span className={`text-xs font-bold ${theme.textPrimary}`}>{Math.round(hour.temp)}°</span>
-                        </div>
-                    ))}
-                </div>
-
-                <div className={`w-full h-px ${theme.moduleDivider || 'bg-gradient-to-r from-transparent via-white/15 to-transparent'} my-1`}></div>
-
-                <div className="flex justify-around text-center px-2 pb-1">
-                    <div>
-                        <div className={`text-[8px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Wind</div>
-                        <div className={`${theme.textPrimary} font-semibold text-sm`}>{Math.round(current.wind_speed_10m)} <span className="text-[10px] font-normal opacity-60">mph</span></div>
-                    </div>
-                    <div>
-                        <div className={`text-[8px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Humidity</div>
-                        <div className={`${theme.textPrimary} font-semibold text-sm`}>{current.relative_humidity_2m}<span className="text-[10px] font-normal opacity-60">%</span></div>
-                    </div>
-                    <div>
-                        <div className={`text-[8px] ${theme.textAccent} opacity-70 uppercase tracking-wider mb-0.5`}>Precip</div>
-                        <div className={`${theme.textPrimary} font-semibold text-sm`}>{current.precipitation}<span className="text-[10px] font-normal opacity-60">"</span></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      <div className="card flex h-full w-full items-center justify-center">
+        <div className="text-base font-medium text-fg-muted">Loading weather…</div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="card flex h-full w-full flex-col items-center justify-center gap-4 p-6">
+        <WarningIcon className="h-9 w-9 text-danger" />
+        <div className="text-center">
+          <div className="text-base font-semibold text-fg">Weather unavailable</div>
+          <div className="mt-1 text-sm text-fg-muted">{error}</div>
+        </div>
+        <button type="button" onClick={refresh} className="btn">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!weather) return null;
+
+  const current = weather.current;
+  const daily = weather.daily;
+  const isDay = current.is_day !== 0;
+
+  return (
+    <div className="card relative flex h-full w-full flex-col overflow-hidden">
+      <WeatherBackdrop code={current.weather_code} isDay={isDay} />
+
+      <button
+        type="button"
+        onClick={refresh}
+        disabled={loading}
+        className="icon-btn absolute top-3 right-3 z-20"
+        aria-label="Refresh weather"
+      >
+        <RefreshIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+      </button>
+
+      {/* Current conditions */}
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pt-6">
+        <div className="flex items-center gap-2 text-sm font-medium text-fg-muted">
+          <span className="truncate">{locationName}</span>
+          {stale && (
+            <span className="text-warning" title="Showing last known reading">
+              <WarningIcon className="h-4 w-4" />
+            </span>
+          )}
+        </div>
+
+        <div className="mt-2 flex items-center gap-5">
+          <WeatherGlyph
+            code={current.weather_code}
+            isDay={isDay}
+            className="h-16 w-16 shrink-0 text-fg-muted"
+          />
+          <div className="nums text-7xl leading-none font-semibold tracking-tighter text-fg">
+            {Math.round(current.temperature_2m)}°
+          </div>
+        </div>
+
+        <div className="mt-3 text-lg font-medium text-fg">
+          {weatherLabel(current.weather_code)}
+        </div>
+
+        <div className="nums mt-1 flex items-center gap-3 text-sm text-fg-muted">
+          <span>H {Math.round(daily.temperature_2m_max[0])}°</span>
+          <span className="text-fg-faint">·</span>
+          <span>L {Math.round(daily.temperature_2m_min[0])}°</span>
+          <span className="text-fg-faint">·</span>
+          <span>Feels {Math.round(current.apparent_temperature)}°</span>
+        </div>
+      </div>
+
+      {/* Hourly forecast + stats */}
+      <div className="relative z-10 shrink-0 px-3 pb-3">
+        <div className="divider mb-2" />
+
+        <div
+          className="scroll-x scrollbar-hide edge-fade-x flex gap-1 pb-1"
+          style={{ scrollSnapType: 'x proximity' }}
+        >
+          {hourly.map((hour) => (
+            <div
+              key={hour.time}
+              className="flex min-w-[3.5rem] shrink-0 flex-col items-center gap-1.5 rounded-xl py-1.5"
+              style={{ scrollSnapAlign: 'start' }}
+            >
+              <span className="text-xs font-medium text-fg-faint">
+                {new Date(hour.time)
+                  .toLocaleTimeString([], { hour: 'numeric' })
+                  .replace(' ', '')}
+              </span>
+              <WeatherGlyph code={hour.code} className="h-5 w-5 text-fg-muted" />
+              <span className="nums text-sm font-semibold text-fg">
+                {Math.round(hour.temp)}°
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="divider my-2" />
+
+        <div className="flex items-start justify-around">
+          <Stat
+            icon={WindIcon}
+            label="Wind"
+            value={Math.round(current.wind_speed_10m)}
+            unit="mph"
+          />
+          <Stat
+            icon={HumidityIcon}
+            label="Humidity"
+            value={Math.round(current.relative_humidity_2m)}
+            unit="%"
+          />
+          <Stat
+            icon={PrecipIcon}
+            label="Precip"
+            value={current.precipitation.toFixed(2)}
+            unit="in"
+          />
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default WeatherModule;

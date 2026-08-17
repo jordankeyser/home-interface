@@ -1,34 +1,35 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { SettingsProvider } from './context/SettingsContext';
+import SleepMode from './components/SleepMode';
 import Layout from './components/Layout';
 import ClockBar from './components/ClockBar';
-import TrainModule from './components/modules/Train/TrainModule';
 import WeatherModule from './components/modules/Weather/WeatherModule';
+import TrainModule from './components/modules/Train/TrainModule';
 import StocksModule from './components/modules/Stocks/StocksModule';
-import SleepMode from './components/SleepMode';
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
     <SettingsProvider>
+      {/* SleepMode sits above Layout so every module can read sleep state and
+          pause its polling, and so the sleep overlay covers the whole panel. */}
       <SleepMode>
         <Layout isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen}>
-          {/* Left Column: ClockBar + Weather Stacked */}
-          <div className="flex flex-col gap-3 h-full min-h-0 min-w-0 overflow-visible">
+          {/* Left: clock over weather */}
+          <div className="flex h-full min-h-0 min-w-0 flex-col gap-4">
             <ClockBar onSettingsClick={() => setIsSettingsOpen(true)} />
-            <div className="flex-1 min-h-0 min-w-0 overflow-visible">
+            <div className="min-h-0 min-w-0 flex-1">
               <WeatherModule />
             </div>
           </div>
 
-          {/* Right Column: Train Full Height */}
-          <div className="h-full min-h-0 min-w-0 overflow-visible flex flex-col gap-3">
-            <div className="flex-1 min-h-0 min-w-0">
+          {/* Right: arrivals over the market ticker */}
+          <div className="flex h-full min-h-0 min-w-0 flex-col gap-4">
+            <div className="min-h-0 min-w-0 flex-1">
               <TrainModule />
             </div>
-            {/* Placeholder module for future content (slightly larger than the time module) */}
-            <div className="h-20 md:h-24 min-w-0">
+            <div className="h-[76px] shrink-0 min-w-0">
               <StocksModule />
             </div>
           </div>

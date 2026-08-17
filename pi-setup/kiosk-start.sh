@@ -1,65 +1,70 @@
-#!/bin/bash
-# Kiosk Startup Script for Home Interface on Raspberry Pi
-# This script launches the app in fullscreen kiosk mode
+#!/usr/bin/env bash
+#
+# Launches Chromium against the local control server.
+#
+# It does NOT start a Vite dev server any more. The old version ran `npm start`
+# (Vite dev, with HMR, a file watcher and unminified sources) as the production
+# front-end on a Raspberry Pi, then slept 10 seconds hoping it was up.
+set -euo pipefail
 
-# Wait for network to be ready
-echo "Waiting for network connection..."
-while ! ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1; do
+APP_URL="${APP_URL:-http://127.0.0.1:3001}"
+READY_TIMEOUT="${READY_TIMEOUT:-90}"
+
+log() { echo "[kiosk] $*"; }
+
+# Wait for the control server (systemd starts it first, but ordering is not a
+# readiness guarantee).
+log "Waiting for ${APP_URL} ..."
+deadline=$((SECONDS + READY_TIMEOUT))
+until curl -fsS --max-time 2 "${APP_URL}/healthz" >/dev/null 2>&1; do
+    if (( SECONDS >= deadline )); then
+        log "ERROR: control server did not become ready within ${READY_TIMEOUT}s"
+        log "       check: journalctl -u home-interface-server -n 50"
+        exit 1
+    fi
     sleep 1
 done
-echo "Network is ready!"
+log "Control server is up."
 
-# Navigate to the app directory
-cd /home/jordankeyser/Desktop/home-interface || exit 1
+# Screen blanking and DPMS are handled in-app (idle sleep dims the backlight and
+# keeps the touch digitiser alive), so X must not also blank the panel.
+xset s off || true
+xset -dpms || true
+xset s noblank || true
 
-# Start the Vite development server in the background
-echo "Starting Vite server..."
-npm start > /home/jordankeyser/Desktop/home-interface/logs/vite.log 2>&1 &
-VITE_PID=$!
-
-# Wait for the server to be ready
-echo "Waiting for server to start..."
-sleep 10
-
-# Check if server is running
-until curl -s http://localhost:5173 > /dev/null; do
-    echo "Waiting for localhost:5173..."
-    sleep 2
-done
-
-echo "Server is ready! Launching kiosk..."
-
-# Disable screen blanking and power management
-xset s off
-xset -dpms
-xset s noblank
-
-# Hide mouse cursor after 3 seconds of inactivity
-unclutter -idle 3 &
-
-# Launch Chromium in kiosk mode (try both command names)
-if command -v chromium-browser &> /dev/null; then
-    CHROMIUM_CMD="chromium-browser"
-else
-    CHROMIUM_CMD="chromium"
+# Hide the pointer when idle.
+if command -v unclutter >/dev/null 2>&1; then
+    unclutter -idle 2 -root &
 fi
 
-$CHROMIUM_CMD \
+if command -v chromium-browser >/dev/null 2>&1; then
+    CHROMIUM=chromium-browser
+elif command -v chromium >/dev/null 2>&1; then
+    CHROMIUM=chromium
+else
+    log "ERROR: chromium not found"
+    exit 1
+fi
+
+# A persistent profile dir keeps the HTTP cache and localStorage (settings) so a
+# restart doesn't refetch the bundle or lose configuration. The old flags sent
+# the cache to /dev/null.
+PROFILE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/home-interface-chromium"
+mkdir -p "$PROFILE_DIR"
+
+log "Launching ${CHROMIUM}"
+exec "$CHROMIUM" \
     --kiosk \
+    --user-data-dir="$PROFILE_DIR" \
+    --app="$APP_URL" \
     --noerrdialogs \
     --disable-infobars \
+    --disable-session-crashed-bubble \
+    --disable-features=TranslateUI,Translate \
     --no-first-run \
-    --fast \
-    --fast-start \
-    --disable-features=TranslateUI \
-    --disk-cache-dir=/dev/null \
-    --overscroll-history-navigation=0 \
     --disable-pinch \
-    --enable-features=OverlayScrollbar \
+    --overscroll-history-navigation=0 \
+    --autoplay-policy=no-user-gesture-required \
     --check-for-update-interval=31536000 \
-    --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' \
-    http://localhost:5173
-
-# If Chromium exits, kill the Vite server
-kill $VITE_PID
-
+    --password-store=basic \
+    --enable-features=OverlayScrollbar

@@ -1,60 +1,80 @@
-import React, { useState, useEffect } from 'react';
-import { useSettings } from '../context/SettingsContext';
+import { useState, useEffect } from 'react';
+import { SettingsIcon, OfflineIcon } from './icons';
+import { useOnline } from '../hooks/useOnline';
+import { useDisplay } from '../hooks/useDisplay';
 
+/**
+ * The clock is the thing you glance at most from across the room, so it is the
+ * largest element on the panel. It used to be `text-3xl` while the weather
+ * temperature was `text-7xl` — the hierarchy was inverted for the viewing
+ * distance.
+ */
 const ClockBar = ({ onSettingsClick }) => {
-    const [time, setTime] = useState(new Date());
-    const { currentTheme } = useSettings();
-    const theme = currentTheme.colors;
-    const barCard = theme.moduleCard || `${theme.moduleBg} ${theme.border} border shadow-lg rounded-xl`;
+  const [now, setNow] = useState(() => new Date());
+  const online = useOnline();
+  const { isAsleep } = useDisplay();
 
-    useEffect(() => {
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
+  useEffect(() => {
+    if (isAsleep) return undefined;
 
-    // Refresh time immediately when waking from sleep
-    useEffect(() => {
-        const handleWakeFromSleep = () => {
-            setTime(new Date());
-        };
+    // Tick on the minute boundary rather than every second: the display only
+    // shows minutes, so a 1s interval was 60x more renders than needed.
+    let timer;
 
-        window.addEventListener('wakeFromSleep', handleWakeFromSleep);
-
-        return () => {
-            window.removeEventListener('wakeFromSleep', handleWakeFromSleep);
-        };
-    }, []);
-
-    const formatTime = (date) => {
-        return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const schedule = () => {
+      const d = new Date();
+      setNow(d);
+      const msToNextMinute = 60_000 - (d.getSeconds() * 1000 + d.getMilliseconds());
+      timer = setTimeout(schedule, msToNextMinute + 50);
     };
 
-    const formatDate = (date) => {
-        return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [isAsleep]);
 
-    return (
-        <div className={`w-full ${barCard} p-6 flex justify-between items-center relative`}>
-            <div className="flex flex-col gap-1">
-                <div className={`text-3xl font-bold ${theme.textPrimary} tracking-tight leading-none`}>
-                    {formatTime(time)}
-                </div>
-                <div className={`text-sm ${theme.textAccent} font-medium uppercase tracking-wider`}>
-                    {formatDate(time)}
-                </div>
-            </div>
-            <button
-                onClick={onSettingsClick}
-                className={`p-3 rounded-full ${theme.buttonBg} ${theme.buttonHover} ${theme.buttonActive} transition-colors ${theme.textSecondary} hover:${theme.textPrimary} absolute right-4 touch-manipulation min-w-[48px] min-h-[48px] flex items-center justify-center`}
-                aria-label="Open Settings"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            </button>
+  const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const [clock, meridiem] = time.split(' ');
+
+  return (
+    <div className="card flex shrink-0 items-center justify-between gap-4 px-6 py-5">
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-2">
+          <span className="nums text-6xl leading-none font-semibold tracking-tight text-fg">
+            {clock}
+          </span>
+          {meridiem && (
+            <span className="text-lg font-medium text-fg-muted">{meridiem}</span>
+          )}
         </div>
-    );
+        <div className="mt-2 truncate text-sm font-medium text-fg-muted">
+          {now.toLocaleDateString([], {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          })}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        {!online && (
+          <span
+            className="flex h-12 w-12 items-center justify-center text-warning"
+            title="No network connection"
+          >
+            <OfflineIcon className="h-5 w-5" />
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={onSettingsClick}
+          className="icon-btn"
+          aria-label="Open settings"
+        >
+          <SettingsIcon className="h-6 w-6" />
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export default ClockBar;
