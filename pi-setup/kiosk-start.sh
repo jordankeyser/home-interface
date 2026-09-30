@@ -173,8 +173,12 @@ launch_chromium() {
     # This function runs in the background. `exec` makes chromium_pid the real
     # browser PID instead of a wrapper subshell, so supervision and cleanup do
     # not orphan a browser after a restart.
+    # Chromium 151's native Wayland GPU path paints an entirely white frame on
+    # this Pi's DSI display. Software rendering preserves native Wayland touch
+    # input and was verified from the live framebuffer before being enabled.
     exec "$CHROMIUM" \
         --kiosk \
+        --disable-gpu \
         --noerrdialogs \
         --disable-infobars \
         --no-first-run \
