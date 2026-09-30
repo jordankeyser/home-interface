@@ -3,9 +3,6 @@ import { useSettings } from '../hooks/useSettings';
 import { useDisplay } from '../hooks/useDisplay';
 import { themes } from '../config/themes';
 import { shutdownHost } from '../lib/displayApi';
-import { testHomeAssistant } from '../lib/homeAssistantClient';
-import { isSupported } from '../lib/haEntities';
-import { dragScroll } from '../lib/dragScroll';
 import ConfirmDialog from './ConfirmDialog';
 import {
   CloseIcon,
@@ -102,75 +99,6 @@ const Section = ({ title, children }) => (
   </section>
 );
 
-/**
- * Checks the address and token as typed — before saving — so a wrong token is
- * caught here rather than as an error on the devices page.
- */
-const HomeAssistantSection = ({ url, token, onChange }) => {
-  const [test, setTest] = useState({ state: 'idle' });
-
-  const runTest = async () => {
-    setTest({ state: 'testing' });
-    const result = await testHomeAssistant(url.trim(), token.trim(), { filter: isSupported });
-    setTest(
-      result.ok
-        ? {
-            state: 'ok',
-            message: `Connected — ${result.count} ${result.count === 1 ? 'device' : 'devices'} found`,
-          }
-        : { state: 'fail', message: result.reason }
-    );
-  };
-
-  // Editing either field makes an earlier result meaningless.
-  const handleChange = (e) => {
-    setTest({ state: 'idle' });
-    onChange(e);
-  };
-
-  return (
-    <Section title="Home Assistant">
-      <Field
-        label="Address"
-        name="haUrl"
-        value={url}
-        onChange={handleChange}
-        placeholder="http://127.0.0.1:8123"
-        inputMode="url"
-        hint="On the Pi itself this is http://127.0.0.1:8123"
-      />
-      <SecretField
-        label="Access token"
-        name="haToken"
-        value={token}
-        onChange={handleChange}
-        placeholder="Long-lived access token"
-        hint="Home Assistant → your profile → Security → Long-lived access tokens"
-      />
-      <div className="flex min-h-[48px] items-center gap-3">
-        <button
-          type="button"
-          onClick={runTest}
-          disabled={!url.trim() || !token.trim() || test.state === 'testing'}
-          className="btn shrink-0 disabled:opacity-40"
-        >
-          {test.state === 'testing' ? 'Testing…' : 'Test connection'}
-        </button>
-        {test.message && (
-          <span
-            className={`min-w-0 text-sm font-medium ${
-              test.state === 'ok' ? 'text-positive' : 'text-danger'
-            }`}
-            role="status"
-          >
-            {test.message}
-          </span>
-        )}
-      </div>
-    </Section>
-  );
-};
-
 const SettingsModal = ({ onClose }) => {
   const { settings, updateSettings } = useSettings();
   const { sleep } = useDisplay();
@@ -208,7 +136,7 @@ const SettingsModal = ({ onClose }) => {
         </div>
       </header>
 
-      <div ref={dragScroll} className="scroll-y min-h-0 flex-1 p-4">
+      <div className="scroll-y min-h-0 flex-1 p-4">
         <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="space-y-4">
             <Section title="Transit">
@@ -277,12 +205,6 @@ const SettingsModal = ({ onClose }) => {
           </div>
 
           <div className="space-y-4">
-            <HomeAssistantSection
-              url={form.haUrl || ''}
-              token={form.haToken || ''}
-              onChange={handleChange}
-            />
-
             <Section title="Display">
               <div>
                 <span className="label">Sleep after inactivity</span>

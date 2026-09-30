@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useCTA } from '../../../hooks/useCTA';
 import { useDisplay } from '../../../hooks/useDisplay';
-import { dragScroll } from '../../../lib/dragScroll';
 import {
   RefreshIcon,
   PauseIcon,
@@ -162,9 +161,10 @@ const TrainModule = () => {
         </div>
       </div>
 
-      {/* Finger scrolling via lib/dragScroll: Chromium on the panel doesn't
-          scroll on touch drags by itself. */}
-      <div ref={dragScroll} className="scroll-y train-scroll-mask min-h-0 flex-1 pr-1">
+      {/* Native scrolling — the previous version reimplemented touch scrolling
+          with preventDefault + manual scrollTop, which threw away momentum and
+          rubber-banding and made the list feel dead under a finger. */}
+      <div className="scroll-y train-scroll-mask min-h-0 flex-1 pr-1">
         {groups.length === 0 ? (
           <div className="mt-12 text-center text-base text-fg-muted">
             No trains scheduled
