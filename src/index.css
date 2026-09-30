@@ -581,40 +581,31 @@ textarea {
   user-select: text;
 }
 
-/* Native momentum scrolling — do not reimplement this in JS.
-   Horizontal panning stays allowed (and only the y axis is contained) so a
-   sideways swipe that starts on a list still reaches the page pager. */
+/* Native momentum scrolling — do not reimplement this in JS. */
 .scroll-y {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
-/* Swipe between full-screen pages. Native scroll snapping rather than JS drag
-   handling: the compositor tracks the finger, which is what keeps it smooth on
-   a Pi. `contain` stops a hard fling at the last page from doing anything
-   beyond it. */
+/* Swipe between full-screen pages (see Pager.jsx). The browser keeps vertical
+   panning for the lists inside; horizontal drags are left to the pager's
+   pointer handlers, which move the track with a transform. */
 .pager {
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.pager-track {
   display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  touch-action: pan-x pan-y;
-  scrollbar-width: none;
+  will-change: transform;
 }
 
-.pager::-webkit-scrollbar {
-  display: none;
-}
-
-.pager > * {
+.pager-track > * {
   flex: 0 0 100%;
   min-width: 0;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
 }
 
 /* Thick enough to grab with a fingertip. */
