@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { SettingsIcon, OfflineIcon } from './icons';
 import { useOnline } from '../hooks/useOnline';
 import { useDisplay } from '../hooks/useDisplay';
-import LightsShortcut from './LightsShortcut';
 
 /**
  * The clock is the thing you glance at most from across the room, so it is the
@@ -77,8 +76,6 @@ const ClockBar = ({ onSettingsClick }) => {
           <SettingsIcon className="h-6 w-6" />
         </button>
       </div>
-
-      <LightsShortcut className="absolute right-3 bottom-3 z-20" />
     </div>
   );
 };

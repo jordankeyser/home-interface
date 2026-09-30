@@ -1,8 +1,7 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from './useSettings';
 import { useDisplay } from './useDisplay';
 import { connectHomeAssistant } from '../lib/homeAssistantClient';
-import { HomeAssistantContext } from '../context/homeAssistantStore';
 import { domainOf, friendlyName, isOn, isSupported, isUnavailable } from '../lib/haEntities';
 
 /** How long a tapped tile shows its new state while waiting for Home Assistant to confirm it. */
@@ -30,7 +29,7 @@ const applyOverride = (entity, ov) => ({
  * closes while the panel sleeps, like the other modules' polling, and waking
  * fetches a fresh snapshot.
  */
-export const useHomeAssistantConnection = () => {
+export const useHomeAssistant = () => {
   const { settings } = useSettings();
   const { isAsleep } = useDisplay();
   const url = (settings.haUrl || '').trim();
@@ -275,5 +274,6 @@ export const useHomeAssistantConnection = () => {
   };
 };
 
-/** The panel's Home Assistant state and actions (see HomeAssistantProvider). */
-export const useHomeAssistant = () => useContext(HomeAssistantContext);
+// Compatibility export for any already-open hot-reloaded module. The panel
+// now owns this connection directly again, so there is no provider dependency.
+export const useHomeAssistantConnection = useHomeAssistant;
