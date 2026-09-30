@@ -1,6 +1,5 @@
-import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Children, useEffect, useRef, useState } from 'react';
 import { useDisplay } from '../hooks/useDisplay';
-import { PagerContext } from '../context/pagerStore';
 
 const pageOf = (el) => (el.clientWidth > 0 ? Math.round(el.scrollLeft / el.clientWidth) : 0);
 
@@ -12,8 +11,8 @@ const scrollToPage = (el, i, behavior = 'smooth') =>
  * back never shows a loading state and each page's data keeps flowing.
  *
  * The dots are an indicator, not controls — at 6px they'd be far below the
- * 48px tap-target floor, and swiping is the gesture. Buttons elsewhere can
- * jump pages through PagerContext. Arrow keys also page, for desktop testing.
+ * 48px tap-target floor, and swiping is the gesture. Arrow keys also page, for
+ * desktop testing.
  */
 const Pager = ({ children }) => {
   const pages = Children.toArray(children);
@@ -22,10 +21,6 @@ const Pager = ({ children }) => {
   const { isAsleep } = useDisplay();
 
   const onScroll = () => setIndex(pageOf(trackRef.current));
-
-  // The same native smooth scroll the arrow keys use; snapping settles it.
-  const goTo = useCallback((i) => scrollToPage(trackRef.current, i), []);
-  const pager = useMemo(() => ({ index, goTo }), [index, goTo]);
 
   // Always wake to the first page: trains and weather are what a glance at
   // the wall is for.
@@ -47,35 +42,33 @@ const Pager = ({ children }) => {
   }, [pages.length]);
 
   return (
-    <PagerContext.Provider value={pager}>
-      <div className="relative h-full w-full">
-        <div ref={trackRef} onScroll={onScroll} className="pager h-full w-full">
+    <div className="relative h-full w-full">
+      <div ref={trackRef} onScroll={onScroll} className="pager h-full w-full">
+        {pages.map((page, i) => (
+          <section key={page.key ?? i} className="h-full p-4">
+            {page}
+          </section>
+        ))}
+      </div>
+
+      {pages.length > 1 && (
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-[5px] flex justify-center gap-1.5"
+          aria-hidden="true"
+        >
           {pages.map((page, i) => (
-            <section key={page.key ?? i} className="h-full p-4">
-              {page}
-            </section>
+            <span
+              key={page.key ?? i}
+              className="h-1.5 rounded-full transition-all duration-300"
+              style={{
+                width: i === index ? '1.25rem' : '0.375rem',
+                backgroundColor: i === index ? 'var(--fg-muted)' : 'var(--line-strong)',
+              }}
+            />
           ))}
         </div>
-
-        {pages.length > 1 && (
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-[5px] flex justify-center gap-1.5"
-            aria-hidden="true"
-          >
-            {pages.map((page, i) => (
-              <span
-                key={page.key ?? i}
-                className="h-1.5 rounded-full transition-all duration-300"
-                style={{
-                  width: i === index ? '1.25rem' : '0.375rem',
-                  backgroundColor: i === index ? 'var(--fg-muted)' : 'var(--line-strong)',
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </PagerContext.Provider>
+      )}
+    </div>
   );
 };
 

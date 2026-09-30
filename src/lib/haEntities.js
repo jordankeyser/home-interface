@@ -24,26 +24,6 @@ export const isOn = (entity) => entity.state === 'on';
 
 export const isUnavailable = (entity) => entity.state === 'unavailable';
 
-export const isLight = (entity) => domainOf(entity.entity_id) === 'light';
-
-const colorModes = (entity) => entity.attributes?.supported_color_modes || [];
-
-/** Modes that take any colour, not just shades of white. */
-const COLOR_MODES = new Set(['hs', 'xy', 'rgb', 'rgbw', 'rgbww']);
-
-export const supportsColor = (entity) =>
-  isLight(entity) && colorModes(entity).some((m) => COLOR_MODES.has(m));
-
-/** Tunable white. Colour bulbs usually do this too. */
-export const supportsColorTemp = (entity) =>
-  isLight(entity) && colorModes(entity).includes('color_temp');
-
-/** The bulb's white range in kelvin, falling back to a typical bulb's. */
-export const colorTempRange = (entity) => ({
-  min: entity.attributes?.min_color_temp_kelvin ?? 2700,
-  max: entity.attributes?.max_color_temp_kelvin ?? 6500,
-});
-
 /** Dimmable lights report at least one colour mode other than plain on/off. */
 export const supportsBrightness = (entity) =>
   domainOf(entity.entity_id) === 'light' &&

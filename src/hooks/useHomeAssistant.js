@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSettings } from './useSettings';
 import { useDisplay } from './useDisplay';
 import { connectHomeAssistant } from '../lib/homeAssistantClient';
-import { domainOf, friendlyName, isOn, isSupported, isUnavailable } from '../lib/haEntities';
+import { domainOf, friendlyName, isOn, isSupported } from '../lib/haEntities';
 
 /** How long a tapped tile shows its new state while waiting for Home Assistant to confirm it. */
 const OVERRIDE_MS = 6000;
@@ -12,17 +12,17 @@ const EMPTY = new Map();
 
 const blank = (key) => ({ key, status: 'connecting', loaded: false, states: EMPTY, layout: null });
 
-const withBrightness = (pct) => (pct ? { brightness_pct: Math.round(pct) } : {});
-
 const applyOverride = (entity, ov) => ({
   ...entity,
   state: ov.state,
-  attributes: ov.attributes ? { ...entity.attributes, ...ov.attributes } : entity.attributes,
+  attributes:
+    ov.brightness === undefined
+      ? entity.attributes
+      : { ...entity.attributes, brightness: ov.brightness },
 });
 
 /**
- * Live device state from Home Assistant, grouped by room. Called once, by
- * HomeAssistantProvider; everything else reads it through `useHomeAssistant`.
+ * Live device state from Home Assistant, grouped by room.
  *
  * The connection stays open while the panel is awake — not just while the
  * devices page is showing — so swiping over never waits on a handshake. It
@@ -163,60 +163,24 @@ export const useHomeAssistant = () => {
         'light',
         'turn_on',
         { entity_id: id, brightness_pct: Math.round(pct) },
-        [[id, { state: 'on', attributes: { brightness: Math.round((pct / 100) * 255) } }]],
+        [[id, { state: 'on', brightness: Math.round((pct / 100) * 255) }]],
         `Couldn’t dim ${friendlyName(entity)}`
       );
     },
     [run]
   );
 
-  /** White light, warm to cool. Pass a brightness to also set it, e.g. when the light is off. */
-  const setColorTemp = useCallback(
-    (entity, kelvin, brightnessPct) => {
-      const id = entity.entity_id;
-      return run(
-        'light',
-        'turn_on',
-        { entity_id: id, color_temp_kelvin: kelvin, ...withBrightness(brightnessPct) },
-        [[id, { state: 'on', attributes: { color_mode: 'color_temp', color_temp_kelvin: kelvin } }]],
-        `Couldn’t change ${friendlyName(entity)}`
-      );
-    },
-    [run]
-  );
-
-  /** A colour as [hue 0–360, saturation 0–100], optionally with a brightness. */
-  const setColor = useCallback(
-    (entity, hs, brightnessPct) => {
-      const id = entity.entity_id;
-      return run(
-        'light',
-        'turn_on',
-        { entity_id: id, hs_color: hs, ...withBrightness(brightnessPct) },
-        [[id, { state: 'on', attributes: { color_mode: 'hs', hs_color: hs } }]],
-        `Couldn’t change ${friendlyName(entity)}`
-      );
-    },
-    [run]
-  );
-
-  /**
-   * Switches a set of devices on or off in one call. Only the ones not already
-   * in that state are sent, and any mix of domains works.
-   */
-  const setPower = useCallback(
-    (entities, on) => {
-      const target = on ? 'on' : 'off';
-      const ids = entities
-        .filter((e) => !isUnavailable(e) && e.state !== target)
-        .map((e) => e.entity_id);
+  /** Everything in the list that's on, off — one call, any mix of domains. */
+  const turnOff = useCallback(
+    (entities) => {
+      const ids = entities.filter(isOn).map((e) => e.entity_id);
       if (ids.length === 0) return undefined;
       return run(
         'homeassistant',
-        on ? 'turn_on' : 'turn_off',
+        'turn_off',
         { entity_id: ids },
-        ids.map((id) => [id, { state: target }]),
-        on ? 'Couldn’t turn the lights on' : 'Couldn’t turn the lights off'
+        ids.map((id) => [id, { state: 'off' }]),
+        'Couldn’t turn everything off'
       );
     },
     [run]
@@ -268,12 +232,6 @@ export const useHomeAssistant = () => {
     actionError,
     toggle,
     setBrightness,
-    setColorTemp,
-    setColor,
-    setPower,
+    turnOff,
   };
 };
-
-// Compatibility export for any already-open hot-reloaded module. The panel
-// now owns this connection directly again, so there is no provider dependency.
-export const useHomeAssistantConnection = useHomeAssistant;

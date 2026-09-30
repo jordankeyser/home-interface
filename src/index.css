@@ -334,28 +334,6 @@ body {
     filter: brightness(1.08);
   }
 
-  /* The devices page's All on / All off. A solid fill, not frosted glass:
-     a backdrop blur this large costs the Pi's GPU for nothing. Pressing
-     brightens the fill instead of scaling, for the same reason. */
-  .master-btn {
-    border-radius: 1.75rem;
-    border: 1px solid var(--line);
-    background-color: var(--surface-inset);
-    box-shadow: inset 0 1px 0 0 var(--sheen-inner);
-    cursor: pointer;
-    touch-action: manipulation;
-    transition: background-color 150ms ease, opacity 200ms ease;
-  }
-
-  .master-btn:active {
-    background-color: var(--surface-active) !important;
-  }
-
-  .master-btn:disabled {
-    opacity: 0.45;
-    cursor: default;
-  }
-
   /* Inputs sized for a finger, not a mouse. */
   .field {
     width: 100%;

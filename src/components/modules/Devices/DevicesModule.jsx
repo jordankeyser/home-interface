@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { useHomeAssistant } from '../../../hooks/useHomeAssistant';
 import { useDisplay } from '../../../hooks/useDisplay';
-import { displayName, isLight, isOn, isUnavailable } from '../../../lib/haEntities';
-import { BulbIcon, HomeIcon, PowerIcon, WarningIcon } from '../../icons';
+import { displayName, isOn } from '../../../lib/haEntities';
+import { HomeIcon, PowerIcon, WarningIcon } from '../../icons';
 import DeviceTile from './DeviceTile';
 import BrightnessSheet from './BrightnessSheet';
 
-/** Tiles per row in the device list (the left 60% of the panel). */
-const COLUMNS = 3;
-
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** Tiles per row on the 1024px panel. */
+const COLUMNS = 4;
 
 const Message = ({ icon, title, detail, action }) => (
   <div className="card flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center">
@@ -22,50 +20,6 @@ const Message = ({ icon, title, detail, action }) => (
   </div>
 );
 
-const MASTER_STYLES = {
-  on: {
-    button: {
-      backgroundColor: 'color-mix(in srgb, var(--lamp) 16%, var(--surface-inset))',
-      borderColor: 'color-mix(in srgb, var(--lamp) 45%, transparent)',
-    },
-    badge: { backgroundColor: 'var(--lamp)', color: '#1f1500' },
-  },
-  off: {
-    button: undefined,
-    badge: { backgroundColor: 'var(--surface-active)', color: 'var(--fg)' },
-  },
-};
-
-/**
- * The two big targets you can hit without looking. Solid fills rather than
- * the cards' frosted glass: a backdrop blur this large is expensive on the
- * Pi's GPU, and these don't need it.
- */
-const MasterButton = ({ kind, title, detail, disabled, onClick }) => {
-  const styles = MASTER_STYLES[kind];
-  const Icon = kind === 'on' ? BulbIcon : PowerIcon;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="master-btn flex min-h-0 flex-1 flex-col items-start justify-between p-6 text-left"
-      style={styles.button}
-    >
-      <span
-        className="flex h-16 w-16 items-center justify-center rounded-full"
-        style={styles.badge}
-      >
-        <Icon className="h-8 w-8" />
-      </span>
-      <span>
-        <span className="block text-4xl leading-tight font-semibold text-fg">{title}</span>
-        <span className="nums mt-1 block text-base text-fg-muted">{detail}</span>
-      </span>
-    </button>
-  );
-};
-
 const DevicesModule = ({ onSettingsClick }) => {
   const {
     url,
@@ -76,9 +30,7 @@ const DevicesModule = ({ onSettingsClick }) => {
     actionError,
     toggle,
     setBrightness,
-    setColorTemp,
-    setColor,
-    setPower,
+    turnOff,
   } = useHomeAssistant();
   const { isAsleep } = useDisplay();
   const [adjustingId, setAdjustingId] = useState(null);
@@ -144,144 +96,94 @@ const DevicesModule = ({ onSettingsClick }) => {
   }
 
   const all = groups.flatMap((g) => g.entities);
-  // "All on" means lights. Switching every plug on at once could start a
-  // heater or anything else plugged into one.
-  const lights = all.filter((e) => isLight(e) && !isUnavailable(e));
-  const lightsOn = lights.filter(isOn).length;
-  const lightsOff = lights.length - lightsOn;
+  const onCount = all.filter(isOn).length;
   const adjusting = adjustingId && all.find((e) => e.entity_id === adjustingId);
   const adjustingGroup = adjusting && groups.find((g) => g.entities.includes(adjusting));
 
   return (
-    <div className="grid h-full w-full min-w-0 grid-cols-[3fr_2fr] gap-4">
-      <div className="card flex min-h-0 min-w-0 flex-col overflow-hidden p-4">
-        <div className="mb-1 flex shrink-0 items-center justify-between gap-3 pl-1">
-          <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
-            <HomeIcon className="h-6 w-6 shrink-0 text-accent" />
-            <span className="truncate">Home</span>
-          </h2>
-          <div className="flex shrink-0 items-center gap-2 text-sm font-medium">
-            {stale && (
-              <span className="flex items-center gap-1.5 text-warning">
-                <WarningIcon className="h-4 w-4" />
-                Offline
-              </span>
-            )}
-            {lights.length > 0 && (
-              <span className="nums text-fg-muted">
-                {lightsOn} of {plural(lights.length, 'light')} on
-              </span>
-            )}
+    <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
+        <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
+          <HomeIcon className="h-6 w-6 shrink-0 text-accent" />
+          <span className="truncate">Home</span>
+          {onCount > 0 && (
+            <span className="nums ml-1 text-sm font-medium text-fg-muted">{onCount} on</span>
+          )}
+        </h2>
+
+        <div className="flex shrink-0 items-center gap-2">
+          {stale && (
+            <span className="text-warning" title="Can’t reach Home Assistant — showing last known state">
+              <WarningIcon className="h-5 w-5" />
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => turnOff(all)}
+            disabled={stale || onCount === 0}
+            className="btn disabled:opacity-40"
+          >
+            <PowerIcon className="h-5 w-5" />
+            All off
+          </button>
+        </div>
+      </div>
+
+      {actionError && (
+        <div className="mb-2 shrink-0 text-sm font-medium text-danger" role="status">
+          {actionError}
+        </div>
+      )}
+
+      {all.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
+          <div className="text-base font-semibold text-fg">No devices yet</div>
+          <div className="text-sm text-fg-muted">
+            Lights, switches and fans you add in Home Assistant will appear here.
           </div>
         </div>
-
-        {actionError && (
-          <div className="mb-1 shrink-0 px-1 text-sm font-medium text-danger" role="status">
-            {actionError}
+      ) : (
+        <div className="scroll-y min-h-0 flex-1 pr-1 pb-4">
+          {/* Rooms share rows: a one-lamp bedroom sits beside a one-lamp
+              kitchen instead of each taking a full row, so a small home fits
+              without scrolling. Each room spans as many columns as it has
+              devices, up to a full row. */}
+          <div
+            className="grid gap-x-3 gap-y-4"
+            style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
+          >
+            {groups.map((group) => {
+              const span = Math.min(group.entities.length, COLUMNS);
+              return (
+                <section key={group.id ?? 'other'} style={{ gridColumn: `span ${span}` }}>
+                  {group.name && <h3 className="eyebrow mb-2 truncate px-1">{group.name}</h3>}
+                  <div
+                    className="grid gap-3"
+                    style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
+                  >
+                    {group.entities.map((entity) => (
+                      <DeviceTile
+                        key={entity.entity_id}
+                        entity={entity}
+                        name={displayName(entity, group.name)}
+                        disabled={stale}
+                        onToggle={toggle}
+                        onAdjust={(e) => setAdjustingId(e.entity_id)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
-        )}
-
-        {all.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-            <div className="text-base font-semibold text-fg">No devices yet</div>
-            <div className="text-sm text-fg-muted">
-              Lights, switches and fans you add in Home Assistant will appear here.
-            </div>
-          </div>
-        ) : (
-          <div className="scroll-y min-h-0 flex-1 pr-1 pb-4">
-            {/* Rooms share rows: a one-lamp bedroom sits beside a one-lamp
-                kitchen instead of each taking a full row. Each room spans as
-                many columns as it has devices, up to a full row. */}
-            <div
-              className="grid gap-x-3"
-              style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
-            >
-              {groups.map((group) => {
-                const span = Math.min(group.entities.length, COLUMNS);
-                const roomLights = group.entities.filter(
-                  (e) => isLight(e) && !isUnavailable(e)
-                );
-                const anyOn = roomLights.some(isOn);
-                // A room with one light already has its switch: the tile.
-                const roomToggle = roomLights.length > 1;
-                return (
-                  <section key={group.id ?? 'other'} style={{ gridColumn: `span ${span}` }}>
-                    {(group.name || roomToggle) && (
-                    <div className="flex h-12 items-center justify-between gap-2 px-1">
-                      <h3 className="eyebrow truncate">{group.name}</h3>
-                      {roomToggle && (
-                        <button
-                          type="button"
-                          onClick={() => setPower(roomLights, !anyOn)}
-                          disabled={stale}
-                          className="btn -mr-1 shrink-0 px-4 disabled:opacity-40"
-                          aria-label={`Turn ${group.name ?? 'all'} lights ${anyOn ? 'off' : 'on'}`}
-                        >
-                          {anyOn ? 'Turn off' : 'Turn on'}
-                        </button>
-                      )}
-                    </div>
-                    )}
-                    <div
-                      className="grid gap-3"
-                      style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
-                    >
-                      {group.entities.map((entity) => (
-                        <DeviceTile
-                          key={entity.entity_id}
-                          entity={entity}
-                          name={displayName(entity, group.name)}
-                          disabled={stale}
-                          onToggle={toggle}
-                          onAdjust={(e) => setAdjustingId(e.entity_id)}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex min-h-0 min-w-0 flex-col gap-4">
-        <MasterButton
-          kind="on"
-          title="All on"
-          detail={
-            lights.length === 0
-              ? 'No lights yet'
-              : lightsOff === 0
-                ? 'Every light is on'
-                : `Turn on ${plural(lightsOff, 'light')}`
-          }
-          disabled={stale || lightsOff === 0}
-          onClick={() => setPower(lights, true)}
-        />
-        <MasterButton
-          kind="off"
-          title="All off"
-          detail={
-            lights.length === 0
-              ? 'No lights yet'
-              : lightsOn === 0
-                ? 'Every light is off'
-                : `Turn off ${plural(lightsOn, 'light')}`
-          }
-          disabled={stale || lightsOn === 0}
-          onClick={() => setPower(lights, false)}
-        />
-      </div>
+        </div>
+      )}
 
       {adjusting && (
         <BrightnessSheet
           entity={adjusting}
           name={displayName(adjusting, adjustingGroup?.name)}
-          onBrightness={(pct) => setBrightness(adjusting, pct)}
-          onColorTemp={(kelvin) => setColorTemp(adjusting, kelvin)}
-          onColor={(hs) => setColor(adjusting, hs)}
+          onChange={(pct) => setBrightness(adjusting, pct)}
           onClose={() => setAdjustingId(null)}
         />
       )}
