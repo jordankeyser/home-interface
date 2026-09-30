@@ -6,6 +6,24 @@ import { fetchJson, isAbortError, backoffDelay } from '../lib/fetchJson';
 /** 20s keeps arrival countdowns accurate at half the old request volume. */
 const REFRESH_MS = 20_000;
 
+/**
+ * Pins each arrival to this device's clock. CTA times are Chicago wall-clock
+ * strings with no offset ("2026-09-30T14:32:10"), so reading `arrT` against
+ * the Pi's clock goes wrong whenever the Pi's timezone or clock is off. The
+ * response's own timestamp (`tmst`) is on the same clock as `arrT`, so the gap
+ * between them is exact, and it's added to the moment the response arrived.
+ */
+const withDueTimes = (ctatt, receivedAt) => {
+  const serverNow = Date.parse(ctatt.tmst);
+  return (ctatt.eta || []).map((train) => {
+    const arrives = Date.parse(train.arrT);
+    const dueAt = Number.isFinite(serverNow)
+      ? receivedAt + (arrives - serverNow)
+      : arrives;
+    return { ...train, dueAt };
+  });
+};
+
 export const useCTA = () => {
   const { settings } = useSettings();
   const { isAsleep } = useDisplay();
@@ -14,7 +32,6 @@ export const useCTA = () => {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [stationName, setStationName] = useState('');
-  const [isPaused, setIsPaused] = useState(false);
 
   const abortRef = useRef(null);
   const attemptRef = useRef(0);
@@ -47,10 +64,11 @@ export const useCTA = () => {
         throw new Error(data?.ctatt?.errNm || 'CTA API error');
       }
 
-      const etas = data.ctatt.eta || [];
+      const receivedAt = Date.now();
+      const etas = withDueTimes(data.ctatt, receivedAt);
       setArrivals(etas);
       if (etas.length > 0) setStationName(etas[0].staNm);
-      setLastUpdated(new Date());
+      setLastUpdated(new Date(receivedAt));
       setError(null);
       attemptRef.current = 0;
     } catch (err) {
@@ -65,7 +83,7 @@ export const useCTA = () => {
 
   useEffect(() => {
     // No point polling a station board behind a dark backlight.
-    if (isPaused || isAsleep) return undefined;
+    if (isAsleep) return undefined;
 
     fetchArrivals();
 
@@ -91,9 +109,7 @@ export const useCTA = () => {
       clearTimeout(timer);
       abortRef.current?.abort();
     };
-  }, [fetchArrivals, isPaused, isAsleep]);
-
-  const togglePause = useCallback(() => setIsPaused((p) => !p), []);
+  }, [fetchArrivals, isAsleep]);
 
   return {
     arrivals,
@@ -104,7 +120,5 @@ export const useCTA = () => {
     lastUpdated,
     refresh: fetchArrivals,
     stationName,
-    isPaused,
-    togglePause,
   };
 };
