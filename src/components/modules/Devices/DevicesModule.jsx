@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useHomeAssistant } from '../../../hooks/useHomeAssistant';
 import { useDisplay } from '../../../hooks/useDisplay';
 import { displayName, isOn } from '../../../lib/haEntities';
+import { dragScroll } from '../../../lib/dragScroll';
 import { HomeIcon, PowerIcon, WarningIcon } from '../../icons';
 import DeviceTile from './DeviceTile';
 import BrightnessSheet from './BrightnessSheet';
@@ -143,7 +144,7 @@ const DevicesModule = ({ onSettingsClick }) => {
           </div>
         </div>
       ) : (
-        <div className="scroll-y min-h-0 flex-1 pr-1 pb-4">
+        <div ref={dragScroll} className="scroll-y min-h-0 flex-1 pr-1 pb-4">
           {/* Rooms share rows: a one-lamp bedroom sits beside a one-lamp
               kitchen instead of each taking a full row, so a small home fits
               without scrolling. Each room spans as many columns as it has

@@ -581,29 +581,21 @@ textarea {
   user-select: text;
 }
 
-/* Native momentum scrolling — do not reimplement this in JS. */
+/* Scrollable lists. Finger scrolling is done in JS (lib/dragScroll) because
+   Chromium on the panel doesn't turn touch drags into scrolls; `none` stops
+   the browser claiming the gesture halfway. Wheel and scrollbar still work. */
 .scroll-y {
   overflow-y: auto;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  touch-action: pan-y;
+  touch-action: none;
 }
 
-/* Swipe between full-screen pages (see Pager.jsx). The browser keeps vertical
-   panning for the lists inside; horizontal drags are left to the pager's
-   pointer handlers, which move the row by setting scrollLeft. No transform or
-   will-change here: with a GPU-promoted row of glass cards the Pi painted a
-   blank white screen. */
+/* Swipe between full-screen pages (see Pager.jsx), also read from pointer
+   events. One page is displayed at a time — no sliding row or transform,
+   which left the Pi's panel blank white. */
 .pager {
-  display: flex;
-  overflow: hidden;
-  touch-action: pan-y;
-}
-
-.pager > * {
-  flex: 0 0 100%;
-  min-width: 0;
+  touch-action: none;
 }
 
 /* Thick enough to grab with a fingertip. */

@@ -1,38 +1,33 @@
-import { Children, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Children, useEffect, useRef, useState } from 'react';
 import { useDisplay } from '../hooks/useDisplay';
 
-/** Past this fraction of the width, letting go turns the page. */
-const SWIPE_FRACTION = 0.18;
+/** Past this fraction of the width, a swipe turns the page. */
+const SWIPE_FRACTION = 0.15;
 /** …or a quick flick, in px/ms, even if it didn't travel far. */
 const FLICK_VELOCITY = 0.45;
 /** Movement before we decide whether a gesture is a swipe or a tap/scroll. */
-const SLOP_PX = 12;
+const SLOP_PX = 10;
 
 /**
- * Full-screen pages you swipe between. Every page stays mounted, so swiping
- * back never shows a loading state and each page's data keeps flowing.
+ * Full-screen pages you swipe between.
  *
- * The swipe is tracked with pointer events rather than native scroll
- * snapping. On this panel Chromium doesn't reliably turn a finger drag into
- * a scroll (the train list once needed hand-rolled touch scrolling for the
- * same reason), and pointer events arrive whether the touchscreen reports
- * real touches or emulates a mouse. `touch-action: pan-y` on the viewport
- * leaves vertical list scrolling to the browser and hands horizontal drags
- * to us.
+ * Only the current page is displayed; the others stay mounted but hidden, so
+ * their data keeps flowing and switching back is instant. There is no
+ * side-by-side scrolling row or sliding transform: both of those left the
+ * Pi's panel blank white, and a single page laid out on its own is exactly
+ * how the dashboard has always rendered there.
  *
- * Pages move by setting scrollLeft on an overflow-hidden row, not with a
- * transform. The panel went blank white with a transformed (GPU-promoted)
- * track holding every glass card — most likely the Pi 4 running out of GPU
- * tile memory — while this scroll path is one it's known to draw correctly.
+ * Swipes are read from pointer events — Chromium on the panel doesn't turn
+ * finger drags into scrolls — and `touch-action: none` keeps the browser from
+ * claiming the gesture. Vertical drags are left to the lists (see
+ * lib/dragScroll). Arrow keys also page, for desktop testing.
  *
  * The dots are an indicator, not controls — at 6px they'd be far below the
- * 48px tap-target floor, and swiping is the gesture. Arrow keys also page, for
- * desktop testing.
+ * 48px tap-target floor, and swiping is the gesture.
  */
 const Pager = ({ children }) => {
   const pages = Children.toArray(children);
   const count = pages.length;
-  const scrollerRef = useRef(null);
   const dragRef = useRef(null);
   const suppressClickRef = useRef(false);
   const [index, setIndex] = useState(0);
@@ -47,32 +42,7 @@ const Pager = ({ children }) => {
     if (isAsleep) setIndex(0);
   }
 
-  /** Scrolls to the current page, offset by a live drag. */
-  const place = (offsetPx, animate) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollTo({
-      left: index * el.clientWidth - offsetPx,
-      behavior: animate ? 'smooth' : 'instant',
-    });
-  };
-
-  useLayoutEffect(() => {
-    const el = scrollerRef.current;
-    el?.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' });
-  }, [index]);
-
-  // Keep the page aligned if the viewport changes size (the desktop
-  // 7-inch-panel preview toggles it).
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return undefined;
-    const ro = new ResizeObserver(() =>
-      el.scrollTo({ left: index * el.clientWidth, behavior: 'instant' })
-    );
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [index]);
+  const goTo = (i) => setIndex(Math.min(Math.max(i, 0), count - 1));
 
   useEffect(() => {
     const onKey = (e) => {
@@ -84,16 +54,10 @@ const Pager = ({ children }) => {
     return () => window.removeEventListener('keydown', onKey);
   }, [count]);
 
-  const goTo = (i) => {
-    const next = Math.min(Math.max(i, 0), count - 1);
-    if (next === index) place(0, true);
-    else setIndex(next);
-  };
-
   const onPointerDown = (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     // React bubbles events from portals (the brightness sheet) through here
-    // too; dragging its slider must not drag the page behind it.
+    // too; dragging its slider must not turn the page behind it.
     if (!e.currentTarget.contains(e.target)) return;
     dragRef.current = {
       id: e.pointerId,
@@ -114,22 +78,18 @@ const Pager = ({ children }) => {
 
     if (!d.active) {
       if (Math.abs(dx) < SLOP_PX && Math.abs(dy) < SLOP_PX) return;
-      // Mostly vertical: it's a list scroll (or nothing), not a page swipe.
+      // Mostly vertical: a list scroll (or nothing), not a page swipe.
       if (Math.abs(dy) > Math.abs(dx)) {
         dragRef.current = null;
         return;
       }
       d.active = true;
-      e.currentTarget.setPointerCapture(e.pointerId);
     }
 
     const dt = e.timeStamp - d.lastT;
     if (dt > 0) d.velocity = (e.clientX - d.lastX) / dt;
     d.lastX = e.clientX;
     d.lastT = e.timeStamp;
-
-    // scrollLeft clamps at the first and last page on its own.
-    place(dx, false);
   };
 
   const onPointerUp = (e) => {
@@ -148,11 +108,9 @@ const Pager = ({ children }) => {
     const threshold = e.currentTarget.clientWidth * SWIPE_FRACTION;
     if (dx < -threshold || d.velocity < -FLICK_VELOCITY) goTo(index + 1);
     else if (dx > threshold || d.velocity > FLICK_VELOCITY) goTo(index - 1);
-    else goTo(index);
   };
 
   const onPointerCancel = () => {
-    if (dragRef.current?.active) place(0, true);
     dragRef.current = null;
   };
 
@@ -163,24 +121,20 @@ const Pager = ({ children }) => {
     e.stopPropagation();
   };
 
-
   return (
-    <div className="relative h-full w-full">
-      <div
-        ref={scrollerRef}
-        className="pager h-full w-full"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerCancel}
-        onClickCapture={onClickCapture}
-      >
-        {pages.map((page, i) => (
-          <section key={page.key ?? i} className="h-full p-4">
-            {page}
-          </section>
-        ))}
-      </div>
+    <div
+      className="pager relative h-full w-full"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onClickCapture={onClickCapture}
+    >
+      {pages.map((page, i) => (
+        <section key={page.key ?? i} hidden={i !== index} className="h-full p-4">
+          {page}
+        </section>
+      ))}
 
       {count > 1 && (
         <div
@@ -190,7 +144,7 @@ const Pager = ({ children }) => {
           {pages.map((page, i) => (
             <span
               key={page.key ?? i}
-              className="h-1.5 rounded-full transition-all duration-300"
+              className="h-1.5 rounded-full"
               style={{
                 width: i === index ? '1.25rem' : '0.375rem',
                 backgroundColor: i === index ? 'var(--fg-muted)' : 'var(--line-strong)',

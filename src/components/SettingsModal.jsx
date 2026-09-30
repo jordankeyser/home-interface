@@ -5,6 +5,7 @@ import { themes } from '../config/themes';
 import { shutdownHost } from '../lib/displayApi';
 import { testHomeAssistant } from '../lib/homeAssistantClient';
 import { isSupported } from '../lib/haEntities';
+import { dragScroll } from '../lib/dragScroll';
 import ConfirmDialog from './ConfirmDialog';
 import {
   CloseIcon,
@@ -207,7 +208,7 @@ const SettingsModal = ({ onClose }) => {
         </div>
       </header>
 
-      <div className="scroll-y min-h-0 flex-1 p-4">
+      <div ref={dragScroll} className="scroll-y min-h-0 flex-1 p-4">
         <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="space-y-4">
             <Section title="Transit">
