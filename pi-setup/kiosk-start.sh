@@ -2,15 +2,13 @@
 # Kiosk Startup Script for Home Interface on Raspberry Pi
 # This script launches the app in fullscreen kiosk mode
 
-# Wait for network to be ready
-echo "Waiting for network connection..."
-while ! ping -c 1 -W 1 8.8.8.8 > /dev/null 2>&1; do
-    sleep 1
-done
-echo "Network is ready!"
-
 # Navigate to the app directory
 cd /home/jordankeyser/Desktop/home-interface || exit 1
+
+# The dashboard is local and must boot even when Wi-Fi, DNS, or the upstream
+# internet is unavailable. Network-backed modules can show their offline state
+# after the shell is visible; gating Chromium here leaves a blank panel forever.
+mkdir -p logs
 
 # Start the Vite development server in the background
 echo "Starting Vite server..."
@@ -19,13 +17,18 @@ VITE_PID=$!
 
 # Wait for the server to be ready
 echo "Waiting for server to start..."
-sleep 10
-
-# Check if server is running
-until curl -s http://localhost:5173 > /dev/null; do
+for attempt in $(seq 1 30); do
+    if curl -fsS --max-time 1 http://localhost:5173/ > /dev/null 2>&1; then
+        break
+    fi
     echo "Waiting for localhost:5173..."
-    sleep 2
+    sleep 1
 done
+
+if ! curl -fsS --max-time 2 http://localhost:5173/ > /dev/null 2>&1; then
+    echo "Vite failed to start; see logs/vite.log"
+    exit 1
+fi
 
 echo "Server is ready! Launching kiosk..."
 
@@ -62,4 +65,3 @@ $CHROMIUM_CMD \
 
 # If Chromium exits, kill the Vite server
 kill $VITE_PID
-
