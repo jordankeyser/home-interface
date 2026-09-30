@@ -76,22 +76,52 @@ mkdir -p /home/jordankeyser/Desktop/home-interface/logs
 echo "Step 6: Making scripts executable..."
 chmod +x /home/jordankeyser/Desktop/home-interface/pi-setup/*.sh
 
-# Set up the one supported launch path. Raspberry Pi OS Trixie runs labwc;
-# starting the kiosk from both a system unit and the desktop session created the
-# race behind the recurring white panel.
-echo "Step 7: Configuring the labwc kiosk launcher..."
-/home/jordankeyser/Desktop/home-interface/pi-setup/repair-wayland-kiosk.sh
+# Set up systemd service
+echo "Step 7: Setting up systemd service..."
+sudo cp /home/jordankeyser/Desktop/home-interface/pi-setup/home-interface-kiosk.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable home-interface-kiosk.service
 
 # Set up daily update cron job
 echo "Step 8: Setting up daily update cron job..."
 CRON_JOB="0 3 * * * /home/jordankeyser/Desktop/home-interface/pi-setup/daily-update.sh"
 (crontab -l 2>/dev/null | grep -v "daily-update.sh"; echo "$CRON_JOB") | crontab -
 
+# Configure auto-login (if not already done)
+echo "Step 9: Configuring auto-login..."
+if [ ! -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]; then
+    sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
+    echo "[Service]" | sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+    echo "ExecStart=" | sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+    echo "ExecStart=-/sbin/agetty --autologin jordankeyser --noclear %I \$TERM" | sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+fi
+
+# Configure auto-startx in .bash_profile
+echo "Step 10: Configuring auto-start X server..."
+if ! grep -q "startx" /home/jordankeyser/.bash_profile 2>/dev/null; then
+    cat >> /home/jordankeyser/.bash_profile << 'EOF'
+
+# Auto-start X server on login (tty1 only)
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+    startx
+fi
+EOF
+fi
+
 # Hide boot messages by configuring /boot/cmdline.txt
-echo "Step 9: Configuring boot parameters..."
+echo "Step 11: Configuring boot parameters..."
 if ! grep -q "quiet splash" /boot/cmdline.txt 2>/dev/null; then
     sudo sed -i '$ s/$/ quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
 fi
+
+# Create .xinitrc to auto-start the kiosk
+echo "Step 12: Creating .xinitrc..."
+cat > /home/jordankeyser/.xinitrc << 'EOF'
+#!/bin/bash
+# Start the kiosk on X server launch
+exec /home/jordankeyser/Desktop/home-interface/pi-setup/kiosk-start.sh
+EOF
+chmod +x /home/jordankeyser/.xinitrc
 
 echo ""
 echo "========================================="
@@ -100,18 +130,19 @@ echo "========================================="
 echo ""
 echo "Configuration saved. To start the kiosk:"
 echo "1. Option A: Reboot the Pi: sudo reboot"
-echo "2. Option B: log out and back into the desktop session"
+echo "2. Option B: Start manually: startx"
 echo ""
 echo "The kiosk will automatically:"
 echo "- Start on boot"
 echo "- Pull updates daily at 3 AM"
-echo "- Start once from the labwc desktop session"
-echo "- Restart Chromium if it crashes"
+echo "- Restart if it crashes"
 echo ""
 echo "Useful commands:"
 echo "- View logs: tail -f /home/jordankeyser/Desktop/home-interface/logs/vite.log"
 echo "- View update logs: tail -f /home/jordankeyser/Desktop/home-interface/logs/update.log"
-echo "- View launcher log: tail -f ~/.local/state/home-interface/kiosk.log"
+echo "- Stop kiosk: sudo systemctl stop home-interface-kiosk"
+echo "- Check status: sudo systemctl status home-interface-kiosk"
 echo ""
 echo "To exit the kiosk once running, press: Alt+F4"
 echo ""
+
