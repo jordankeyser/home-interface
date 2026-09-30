@@ -1,67 +1,161 @@
-#!/bin/bash
-# Kiosk Startup Script for Home Interface on Raspberry Pi
-# This script launches the app in fullscreen kiosk mode
+#!/usr/bin/env bash
+# Reliable Raspberry Pi kiosk launcher.
+#
+# This file is intentionally safe to invoke from either ~/.xinitrc or the
+# legacy systemd unit. Some existing installs have both wired up; the lock
+# below makes one launcher own the kiosk while the other waits and keeps its
+# parent graphical session alive.
 
-# Navigate to the app directory
-cd /home/jordankeyser/Desktop/home-interface || exit 1
+set -u
 
-# The dashboard is local and must boot even when Wi-Fi, DNS, or the upstream
-# internet is unavailable. Network-backed modules can show their offline state
-# after the shell is visible; gating Chromium here leaves a blank panel forever.
-mkdir -p logs
+APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/home-interface"
+KIOSK_LOG="$STATE_DIR/kiosk.log"
+VITE_LOG="$STATE_DIR/vite.log"
+BOOT_ERROR_URL="file://$APP_DIR/pi-setup/boot-error.html"
 
-# Start the Vite development server in the background
-echo "Starting Vite server..."
-npm start > /home/jordankeyser/Desktop/home-interface/logs/vite.log 2>&1 &
-VITE_PID=$!
+mkdir -p "$STATE_DIR" "$APP_DIR/logs"
+touch "$KIOSK_LOG" "$VITE_LOG"
+ln -sfn "$VITE_LOG" "$APP_DIR/logs/vite.log" 2>/dev/null || true
 
-# Wait for the server to be ready
-echo "Waiting for server to start..."
-for attempt in $(seq 1 30); do
-    if curl -fsS --max-time 1 http://localhost:5173/ > /dev/null 2>&1; then
+exec >>"$KIOSK_LOG" 2>&1
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+
+log "------------------------------------------------------------"
+log "Kiosk launcher starting"
+log "app=$APP_DIR display=$DISPLAY user=$(id -un)"
+
+# Starting Chromium before X is accepting clients produces a white panel or a
+# rapid restart loop. Wait for the actual display, not merely graphical.target.
+display_ready=0
+for _attempt in $(seq 1 120); do
+    if xset q >/dev/null 2>&1; then
+        display_ready=1
         break
     fi
-    echo "Waiting for localhost:5173..."
     sleep 1
 done
 
-if ! curl -fsS --max-time 2 http://localhost:5173/ > /dev/null 2>&1; then
-    echo "Vite failed to start; see logs/vite.log"
+if [ "$display_ready" -ne 1 ]; then
+    log "FATAL: X display $DISPLAY did not become ready within 120 seconds"
     exit 1
 fi
 
-echo "Server is ready! Launching kiosk..."
+# Existing Pi images may launch this script from both systemd and ~/.xinitrc.
+# Blocking is deliberate: if the xinitrc copy loses the race, it must stay
+# alive or startx will tear down the X server underneath the winning copy.
+exec 9>"$STATE_DIR/kiosk.lock"
+if command -v flock >/dev/null 2>&1; then
+    log "Waiting for kiosk launcher lock"
+    flock 9
+fi
+log "Kiosk launcher lock acquired"
 
-# Disable screen blanking and power management
-xset s off
-xset -dpms
-xset s noblank
+cd "$APP_DIR" || {
+    log "FATAL: cannot enter $APP_DIR"
+    exit 1
+}
 
-# Hide mouse cursor after 3 seconds of inactivity
-unclutter -idle 3 &
+server_pid=""
 
-# Launch Chromium in kiosk mode (try both command names)
-if command -v chromium-browser &> /dev/null; then
-    CHROMIUM_CMD="chromium-browser"
+cleanup() {
+    if [ -n "$server_pid" ] && kill -0 "$server_pid" 2>/dev/null; then
+        kill "$server_pid" 2>/dev/null || true
+        wait "$server_pid" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT INT TERM
+
+server_ready() {
+    curl -fsS --max-time 2 http://127.0.0.1:5173/ >/dev/null 2>&1
+}
+
+start_server() {
+    if server_ready; then
+        log "Reusing the server already listening on 127.0.0.1:5173"
+        return 0
+    fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+        log "ERROR: npm is not available in PATH=$PATH"
+        return 1
+    fi
+
+    log "Starting Vite ($(node --version 2>/dev/null || echo 'node unavailable'))"
+    : >"$VITE_LOG"
+    npm start -- --host 127.0.0.1 --port 5173 --strictPort >>"$VITE_LOG" 2>&1 &
+    server_pid=$!
+
+    for _attempt in $(seq 1 45); do
+        if server_ready; then
+            log "Vite is ready on 127.0.0.1:5173 (pid $server_pid)"
+            return 0
+        fi
+        if ! kill -0 "$server_pid" 2>/dev/null; then
+            log "ERROR: Vite exited before becoming ready"
+            tail -40 "$VITE_LOG" 2>/dev/null || true
+            return 1
+        fi
+        sleep 1
+    done
+
+    log "ERROR: Vite did not become ready within 45 seconds"
+    tail -40 "$VITE_LOG" 2>/dev/null || true
+    return 1
+}
+
+if command -v chromium-browser >/dev/null 2>&1; then
+    chromium_cmd="chromium-browser"
+elif command -v chromium >/dev/null 2>&1; then
+    chromium_cmd="chromium"
 else
-    CHROMIUM_CMD="chromium"
+    log "FATAL: neither chromium-browser nor chromium is installed"
+    exit 1
 fi
 
-$CHROMIUM_CMD \
-    --kiosk \
-    --noerrdialogs \
-    --disable-infobars \
-    --no-first-run \
-    --fast \
-    --fast-start \
-    --disable-features=TranslateUI \
-    --disk-cache-dir=/dev/null \
-    --overscroll-history-navigation=0 \
-    --disable-pinch \
-    --enable-features=OverlayScrollbar \
-    --check-for-update-interval=31536000 \
-    --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' \
-    http://localhost:5173
+# Best effort only: neither utility is allowed to prevent the dashboard from
+# starting. DPMS is intentionally disabled because it can power down the touch
+# digitiser on this panel.
+xset s off >/dev/null 2>&1 || true
+xset -dpms >/dev/null 2>&1 || true
+xset s noblank >/dev/null 2>&1 || true
+if command -v unclutter >/dev/null 2>&1 && ! pgrep -x unclutter >/dev/null 2>&1; then
+    unclutter -idle 3 >/dev/null 2>&1 &
+fi
 
-# If Chromium exits, kill the Vite server
-kill $VITE_PID
+if start_server; then
+    kiosk_url="http://127.0.0.1:5173/"
+else
+    kiosk_url="$BOOT_ERROR_URL"
+    log "Launching the on-screen boot diagnostic because Vite is unavailable"
+fi
+
+log "Launching $chromium_cmd at $kiosk_url"
+
+# Hardware compositing was the common factor in the Pi-only white-screen
+# failures after the swipe/UI work. Software rendering is less glamorous but
+# reliable at this panel's 1024x600 resolution. Chromium is relaunched if it
+# crashes or is closed.
+while true; do
+    "$chromium_cmd" \
+        --kiosk \
+        --noerrdialogs \
+        --disable-infobars \
+        --no-first-run \
+        --no-default-browser-check \
+        --disable-session-crashed-bubble \
+        --disable-application-cache \
+        --disable-gpu \
+        --overscroll-history-navigation=0 \
+        --disable-pinch \
+        --check-for-update-interval=31536000 \
+        --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' \
+        "$kiosk_url"
+    exit_code=$?
+    log "Chromium exited with status $exit_code; relaunching in 3 seconds"
+    sleep 3
+done
