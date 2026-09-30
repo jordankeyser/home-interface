@@ -176,6 +176,8 @@ launch_chromium() {
     # Chromium 151's native Wayland GPU path paints an entirely white frame on
     # this Pi's DSI display. Software rendering preserves native Wayland touch
     # input and was verified from the live framebuffer before being enabled.
+    # A wall panel also cannot unlock a desktop keyring after unattended boot;
+    # the basic store prevents that prompt from covering the dashboard.
     exec "$CHROMIUM" \
         --kiosk \
         --disable-gpu \
@@ -183,6 +185,7 @@ launch_chromium() {
         --disable-infobars \
         --no-first-run \
         --no-default-browser-check \
+        --password-store=basic \
         --disable-session-crashed-bubble \
         --disable-application-cache \
         --overscroll-history-navigation=0 \
