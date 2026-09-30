@@ -4,13 +4,9 @@
 #
 # Two things this used to get wrong:
 #
-#   1. It restarted `home-interface-kiosk.service` via `systemctl --user`. That
-#      unit does not exist in user scope — it never did — so the restart always
-#      failed. The kiosk is launched by the X session (.xinitrc), which cron
-#      cannot reach. Handled below: source-only changes are picked up by Vite's
-#      file watcher with no restart at all, and dependency changes trigger a
-#      reboot, which is the only reliable way to restart a session-owned process
-#      from cron.
+#   1. It tried to restart a kiosk systemd unit even though Chromium belongs to
+#      the labwc user session. Cron cannot safely hot-reload that session, so a
+#      validated update now applies through one clean reboot.
 #
 #   2. Any dirty file silently disabled updates forever, with one line in a log
 #      nobody reads. package-lock.json churn from `npm install` is enough to
@@ -23,7 +19,10 @@ REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 [ -d "$REPO_DIR/.git" ] || REPO_DIR="/home/jordankeyser/Desktop/home-interface"
 LOG_FILE="${LOG_FILE:-$REPO_DIR/logs/update.log}"
 BRANCH="${BRANCH:-main}"
-# Reboot when dependencies change so the new ones actually load. 0 to disable.
+# Reboot after every applied update. The Pi used to hot-swap source modules into
+# a live React/Vite page; after large changes that produced a half-old,
+# half-new app and an unexplained white panel. A cold boot is the only supported
+# deployment path now. Set to 0 only for development/testing.
 ALLOW_REBOOT="${ALLOW_REBOOT:-1}"
 FORCE="${FORCE:-0}"
 [ "${1:-}" = "--force" ] && FORCE=1
@@ -122,6 +121,22 @@ if [ "$DEPS_CHANGED" = "1" ]; then
     fi
 fi
 
+# --- validate ---------------------------------------------------------------
+# Never leave the Pi on a revision that cannot build. `vite build` is used as
+# validation even though the kiosk deliberately serves through Vite dev mode.
+# It catches broken imports and transforms before Chromium ever sees them.
+log "Validating the new revision"
+if ! npm run lint || ! npm run build; then
+    log "ERROR: validation failed — rolling back to $LOCAL"
+    git reset --hard "$LOCAL"
+    if [ "$DEPS_CHANGED" = "1" ]; then
+        npm install || log "WARNING: npm install failed after rollback"
+    fi
+    log "Rolled back; the running panel was not restarted."
+    exit 1
+fi
+log "Validation passed"
+
 # --- apply -------------------------------------------------------------------
 # The display service is a system unit, so cron can restart it directly.
 if systemctl list-unit-files 2>/dev/null | grep -q home-interface-display; then
@@ -130,20 +145,14 @@ if systemctl list-unit-files 2>/dev/null | grep -q home-interface-display; then
         log "  WARNING: restart failed (check /etc/sudoers.d/home-interface)"
 fi
 
-if [ "$DEPS_CHANGED" = "1" ]; then
-    # Vite's watcher can hot-reload source changes, but not a new dependency
-    # tree. The kiosk belongs to the X session, which cron cannot signal, so a
-    # reboot is the only reliable way to pick it up.
-    if [ "$ALLOW_REBOOT" = "1" ]; then
-        log "Dependencies changed — rebooting to reload them"
-        sudo -n /sbin/shutdown -r now ||
-            log "  WARNING: reboot failed; changes apply at next manual reboot"
-    else
-        log "ALLOW_REBOOT=0 — dependency changes apply at next reboot"
-    fi
+# Source and dependency changes follow the same path. HMR is excellent for
+# development and the wrong deployment mechanism for an unattended appliance.
+if [ "$ALLOW_REBOOT" = "1" ]; then
+    log "Update validated — rebooting for a clean, atomic deployment"
+    sudo -n /sbin/shutdown -r now ||
+        log "WARNING: reboot failed; run 'sudo reboot' to apply the update"
 else
-    # Source-only change: Vite's file watcher reloads the page by itself.
-    log "Source-only change — Vite's watcher will reload the panel"
+    log "ALLOW_REBOOT=0 — update applies at the next reboot"
 fi
 
 log "Update check finished successfully"

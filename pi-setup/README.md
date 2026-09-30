@@ -1,324 +1,141 @@
-# Raspberry Pi Kiosk Setup Guide
+# Raspberry Pi kiosk setup
 
-This guide will help you set up your Home Interface application as a fullscreen kiosk on a Raspberry Pi with a 7-inch touchscreen.
+These scripts target the deployed hardware: Raspberry Pi OS Trixie, labwc on
+Wayland, Chromium, and the official 1024×600 DSI touchscreen.
 
-## 🎯 Features
+## Repair an existing broken installation
 
-- ✅ **Fullscreen kiosk mode** - No browser UI, no desktop visible
-- ✅ **Touch-optimized** - All buttons sized for touch interaction (minimum 48x48px)
-- ✅ **Auto-start on boot** - Application launches automatically when Pi powers on
-- ✅ **Auto-updates** - Pulls latest code from git once daily at 3 AM
-- ✅ **Auto-restart** - Service restarts automatically if it crashes
-- ✅ **Screen management** - Disables screen blanking and sleep
+Older installers registered the kiosk in up to three places at once:
 
-## 📋 Prerequisites
+1. a system-level `home-interface-kiosk.service`;
+2. `~/.xinitrc`;
+3. labwc autostart.
 
-- Raspberry Pi (3, 4, or 5 recommended)
-- 7-inch touchscreen display
-- Raspberry Pi OS (with desktop) installed
-- Internet connection
-- This repository cloned to `/home/pi/home-interface`
+Those launchers race for Chromium and port 5173. A git rollback cannot remove
+the stale files outside the repository.
 
-## 🚀 Quick Installation
-
-### Step 1: Clone the Repository
+After updating this repository on the Pi, run the one-time repair as the normal
+desktop user:
 
 ```bash
-cd /home/pi
-git clone <your-repository-url> home-interface
-cd home-interface
+cd /home/jordankeyser/Desktop/home-interface
 ```
-
-### Step 2: Run the Installation Script
 
 ```bash
-chmod +x pi-setup/install.sh
-./pi-setup/install.sh
+./pi-setup/repair-wayland-kiosk.sh
 ```
 
-### Step 3: Configure Settings
+The repair backs up the existing launch configuration under
+`~/.local/state/home-interface/repair-backup-*`, disables the stale system
+unit, removes duplicate session entries, preserves the real-touch setting, and
+installs one labwc autostart entry.
 
-Before rebooting, you may want to set up your API keys and settings:
-
-1. Temporarily start the app: `npm start`
-2. Open it in a browser: `http://localhost:5173`
-3. Click the settings gear icon
-4. Enter your:
-   - CTA API Key
-   - Station ID (MapID)
-   - Zip Code
-5. Save settings
-
-Settings are stored in localStorage and will persist.
-
-### Step 4: Reboot
+Then reboot:
 
 ```bash
 sudo reboot
 ```
 
-The kiosk will automatically start!
+## Fresh installation
 
-## 📁 Files Included
-
-### `kiosk-start.sh`
-Main startup script that:
-- Waits for network connection
-- Starts the Vite development server
-- Disables screen blanking
-- Hides mouse cursor after 3 seconds of inactivity
-- Launches Chromium in fullscreen kiosk mode
-
-### `home-interface-kiosk.service`
-Systemd service unit file that:
-- Runs the kiosk automatically on boot
-- Restarts the service if it crashes
-- Manages the kiosk lifecycle
-
-### `daily-update.sh`
-Automated update script that:
-- Runs daily at 3 AM via cron
-- Pulls latest changes from git
-- Installs any new dependencies
-- Restarts the kiosk service
-
-### `install.sh`
-One-time installation script that:
-- Installs all required system packages
-- Sets up Node.js
-- Configures auto-login and auto-start
-- Creates systemd service
-- Sets up cron job for daily updates
-- Hides boot messages
-
-## 🎮 Usage
-
-### Starting/Stopping the Kiosk
+Run this as the normal desktop user, not with `sudo`:
 
 ```bash
-# Check status
-sudo systemctl status home-interface-kiosk
-
-# Start manually
-sudo systemctl start home-interface-kiosk
-
-# Stop
-sudo systemctl stop home-interface-kiosk
-
-# Restart
-sudo systemctl restart home-interface-kiosk
-
-# Disable auto-start
-sudo systemctl disable home-interface-kiosk
-
-# Re-enable auto-start
-sudo systemctl enable home-interface-kiosk
+./pi-setup/install.sh
 ```
 
-### Viewing Logs
+The installer:
+
+- installs Chromium and required utilities;
+- installs a Vite-compatible Node.js if necessary;
+- installs dependencies and requires lint/build to pass;
+- runs the single-owner labwc repair;
+- schedules validated updates at 3:30 AM.
+
+It does not install a Chromium systemd service.
+
+## What boot should do
+
+The supported sequence is:
+
+```text
+Raspberry Pi desktop
+  -> labwc autostart
+  -> pi-setup/kiosk-start.sh
+  -> Vite on 127.0.0.1:5173
+  -> verified Home Interface HTML
+  -> Chromium kiosk
+```
+
+Internet access is not a boot dependency. Weather and CTA may show their normal
+error states while offline, but the local interface and Home Assistant page
+still load.
+
+## Diagnostics
+
+Run:
 
 ```bash
-# Vite server logs
-tail -f /home/pi/home-interface/logs/vite.log
-
-# Update logs
-tail -f /home/pi/home-interface/logs/update.log
-
-# System service logs
-journalctl -u home-interface-kiosk -f
+./pi-setup/diagnose-kiosk.sh
 ```
 
-### Exiting the Kiosk
+A healthy result has:
 
-When the kiosk is running, you can exit by:
-- Pressing **Alt+F4**
-- Connecting via SSH and running: `sudo systemctl stop home-interface-kiosk`
+- one `kiosk-start.sh` launch entry, in `~/.config/labwc/autostart`;
+- no enabled `home-interface-kiosk.service`;
+- one Vite listener on `127.0.0.1:5173`;
+- an HTML response containing `<title>Home Interface</title>`;
+- `mouseEmulation="no"` in the labwc touch configuration.
 
-### Manual Updates
-
-To manually update the application:
+Logs are outside the repository so nightly updates cannot delete them:
 
 ```bash
-cd /home/pi/home-interface
-git pull origin main
-npm install
-sudo systemctl restart home-interface-kiosk
+tail -80 ~/.local/state/home-interface/kiosk.log
 ```
-
-## 🔧 Configuration
-
-### Changing the Port
-
-If you need to change from port 5173, edit:
-1. `vite.config.js` - Set custom port
-2. `pi-setup/kiosk-start.sh` - Update the localhost URL in two places
-
-### Touch Calibration
-
-If your touchscreen needs calibration:
 
 ```bash
-sudo apt install xinput-calibrator
-DISPLAY=:0 xinput_calibrator
+tail -80 ~/.local/state/home-interface/vite.log
 ```
 
-Follow the on-screen instructions and add the output to your X configuration.
+If Vite fails, the panel displays `pi-setup/boot-error.html` and retries.
+If React fails during startup, the in-app error boundary displays a dark error
+screen. Neither failure path should produce a blank white panel.
 
-### Screen Rotation
+## Touchscreen
 
-To rotate the screen, add to `/boot/config.txt`:
+The official DSI panel must remain configured for real touch events:
 
 ```bash
-# For 90-degree rotation
-display_rotate=1
-
-# For 180-degree rotation
-display_rotate=2
-
-# For 270-degree rotation
-display_rotate=3
+grep mouseEmulation ~/.config/labwc/rc.xml
 ```
 
-Then reboot.
+Expected output contains:
 
-### Brightness Control
+```text
+mouseEmulation="no"
+```
 
-Create a script to adjust brightness:
+With `yes`, labwc turns touches into mouse drags and Chromium cannot perform
+native swipe or momentum scrolling.
+
+## Optional display control
+
+Backlight sleep and the shutdown button use a separate, loopback-only service.
+Install it independently:
 
 ```bash
-echo 100 | sudo tee /sys/class/backlight/*/brightness  # Max brightness
-echo 50 | sudo tee /sys/class/backlight/*/brightness   # 50% brightness
+./pi-setup/install-display-server.sh
 ```
 
-## 🐛 Troubleshooting
-
-### Kiosk won't start
-
-1. Check the service status:
-   ```bash
-   sudo systemctl status home-interface-kiosk
-   ```
-
-2. Check logs:
-   ```bash
-   journalctl -u home-interface-kiosk -n 50
-   ```
-
-3. Check if Vite server is running:
-   ```bash
-   curl http://localhost:5173
-   ```
-
-### Black screen after boot
-
-- The app might still be loading. Wait 30 seconds.
-- Check if X server started: `ps aux | grep X`
-- Try restarting: `sudo systemctl restart home-interface-kiosk`
-
-### Touch not working
-
-- Verify touch input: `xinput list`
-- Test touch: `xinput test <device-id>`
-- Reboot if needed
-
-### Updates not working
-
-- Check cron is running: `systemctl status cron`
-- View update logs: `cat /home/pi/home-interface/logs/update.log`
-- Test manual update: `./pi-setup/daily-update.sh`
-
-### Network connection issues
-
-- Ensure Pi has internet: `ping -c 3 google.com`
-- The kiosk waits for network before starting
-- Check network logs: `journalctl -u NetworkManager`
-
-## 🔐 Security Notes
-
-### SSH Access
-
-Keep SSH enabled for remote management:
+Its failure does not prevent the dashboard from booting. Check it with:
 
 ```bash
-sudo systemctl enable ssh
-sudo systemctl start ssh
+curl -s http://127.0.0.1:3001/healthz
 ```
 
-### Firewall
+## Updates
 
-Consider setting up ufw:
-
-```bash
-sudo apt install ufw
-sudo ufw allow ssh
-sudo ufw enable
-```
-
-## 🎨 Touch-Friendly Features
-
-The UI has been optimized for touchscreen use:
-
-- All interactive buttons are minimum 48x48 pixels
-- Added `touch-manipulation` CSS for better touch response
-- Increased tap targets on all controls:
-  - Settings gear icon
-  - Refresh buttons
-  - Pause/play button
-  - Modal buttons
-- Smooth scrolling with momentum
-- No text selection on UI elements
-- Visual feedback on touch (active states)
-
-## 📱 Screen Wake-up
-
-To wake the screen by touch:
-
-1. The Pi should wake from DPMS sleep on touch automatically
-2. If not, disable DPMS entirely by ensuring `xset -dpms` is in the startup script (already included)
-
-## 🔄 Update Schedule
-
-By default, the system checks for updates at **3:00 AM** daily. To change this:
-
-```bash
-# Edit crontab
-crontab -e
-
-# Change the time (format: minute hour day month weekday)
-# Example: 2 AM instead of 3 AM
-0 2 * * * /home/pi/home-interface/pi-setup/daily-update.sh
-```
-
-## ⚡ Performance Tips
-
-1. **Use Raspberry Pi 4 or 5** for best performance
-2. **Overclock** (optional): Edit `/boot/config.txt`
-   ```
-   over_voltage=2
-   arm_freq=1750
-   ```
-3. **Reduce GPU memory** if not needed: Add to `/boot/config.txt`
-   ```
-   gpu_mem=128
-   ```
-
-## 🆘 Support
-
-If you encounter issues:
-1. Check the logs (see "Viewing Logs" section)
-2. Verify all prerequisites are met
-3. Try a fresh installation
-4. Check GitHub issues
-
----
-
-**Made with ❤️ for Raspberry Pi touchscreen kiosks**
-
-
-
-
-
-
-
-
-
+`pi-setup/daily-update.sh` fast-forwards `main`, installs dependency changes,
+runs lint and a production build, rolls back a failed validation, and reboots
+after a successful update. The cold restart prevents Vite HMR from mixing
+modules from different revisions on an unattended panel.

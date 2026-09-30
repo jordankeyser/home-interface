@@ -1,12 +1,17 @@
 {
-  "name": "home-interface-prototype",
+  "name": "home-interface",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Touch dashboard for a wall-mounted Raspberry Pi panel.",
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
+    "display-server": "node server/displayServer.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

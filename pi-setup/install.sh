@@ -1,148 +1,115 @@
-#!/bin/bash
-# Installation Script for Home Interface Kiosk on Raspberry Pi
-# Run this script once to set up the kiosk
+#!/usr/bin/env bash
+# One-time Raspberry Pi OS Trixie + labwc setup for Home Interface.
+#
+# The kiosk must start inside the graphical user session. A system service is
+# deliberately not used for Chromium: it races the desktop and was the source
+# of the recurring unreachable/white panel.
 
-set -e
+set -euo pipefail
 
-echo "========================================="
-echo "Home Interface Kiosk Setup"
-echo "========================================="
-echo ""
+KIOSK_USER="${KIOSK_USER:-$(id -un)}"
+APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 
-# Check if running as jordankeyser user
-if [ "$USER" != "jordankeyser" ]; then
-    echo "ERROR: This script must be run as the 'jordankeyser' user"
+if [[ "$KIOSK_USER" == "root" ]]; then
+    echo "ERROR: run this as the normal desktop user, not with sudo."
     exit 1
 fi
 
-# Update system
-echo "Step 1: Updating system packages..."
-sudo apt update
-sudo apt upgrade -y
+step() { echo; echo "--- $* ---"; }
 
-# Install required packages
-echo "Step 2: Installing required packages..."
+node_is_supported() {
+    command -v node >/dev/null 2>&1 || return 1
+    node -e '
+      const [major, minor] = process.versions.node.split(".").map(Number);
+      process.exit(
+        (major === 20 && minor >= 19) ||
+        (major === 22 && minor >= 12) ||
+        major > 22 ? 0 : 1
+      );
+    '
+}
 
-# Determine which Chromium package is available
+echo "========================================="
+echo " Home Interface kiosk setup"
+echo "========================================="
+echo "  user:    $KIOSK_USER"
+echo "  app dir: $APP_DIR"
+
+step "Installing system packages"
+sudo apt-get update
 if apt-cache policy chromium-browser 2>/dev/null | grep -q "Candidate:.*[0-9]"; then
     CHROMIUM_PKG="chromium-browser"
-elif apt-cache policy chromium 2>/dev/null | grep -q "Candidate:.*[0-9]"; then
-    CHROMIUM_PKG="chromium"
 else
-    echo "ERROR: Neither chromium-browser nor chromium package found"
-    echo "Trying to install chromium anyway..."
     CHROMIUM_PKG="chromium"
 fi
-
-echo "Installing Chromium package: $CHROMIUM_PKG"
-
-sudo apt install -y \
-    $CHROMIUM_PKG \
-    unclutter \
-    xdotool \
-    x11-xserver-utils \
+sudo apt-get install -y \
+    "$CHROMIUM_PKG" \
+    ca-certificates \
+    curl \
     git \
-    curl
+    unclutter \
+    x11-xserver-utils
 
-# Install Node.js if not already installed
-if ! command -v node &> /dev/null; then
-    echo "Step 3: Installing Node.js..."
+step "Checking Node.js"
+if ! node_is_supported; then
+    echo "Installing a Vite-compatible Node.js 20 release..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt install -y nodejs
-else
-    echo "Step 3: Node.js already installed ($(node --version))"
+    sudo apt-get install -y nodejs
 fi
-
-# Verify repository exists
-if [ ! -d "/home/jordankeyser/Desktop/home-interface" ]; then
-    echo "ERROR: Repository not found at /home/jordankeyser/Desktop/home-interface"
-    echo "Please clone the repository first:"
-    echo "  cd /home/jordankeyser/Desktop"
-    echo "  git clone <your-repo-url> home-interface"
+if ! node_is_supported; then
+    echo "ERROR: Node.js 20.19+, 22.12+, or a newer release is required."
+    echo "       Found: $(node --version 2>/dev/null || echo missing)"
     exit 1
 fi
+echo "  node $(node --version)"
+echo "  npm  $(npm --version)"
 
-cd /home/jordankeyser/Desktop/home-interface
-
-# Install npm dependencies
-echo "Step 4: Installing npm dependencies..."
+step "Installing and validating the dashboard"
+cd "$APP_DIR"
 npm install
+npm run lint
+npm run build
+mkdir -p "$APP_DIR/logs"
+chmod +x "$APP_DIR"/pi-setup/*.sh
 
-# Create logs directory
-echo "Step 5: Creating logs directory..."
-mkdir -p /home/jordankeyser/Desktop/home-interface/logs
+step "Installing the single labwc launch path"
+"$APP_DIR/pi-setup/repair-wayland-kiosk.sh"
 
-# Make scripts executable
-echo "Step 6: Making scripts executable..."
-chmod +x /home/jordankeyser/Desktop/home-interface/pi-setup/*.sh
+step "Allowing validated updates to reboot cleanly"
+echo "$KIOSK_USER ALL=(root) NOPASSWD: /sbin/shutdown" | \
+    sudo tee /etc/sudoers.d/home-interface-updater >/dev/null
+sudo chmod 0440 /etc/sudoers.d/home-interface-updater
+sudo visudo -cf /etc/sudoers.d/home-interface-updater
 
-# Set up systemd service
-echo "Step 7: Setting up systemd service..."
-sudo cp /home/jordankeyser/Desktop/home-interface/pi-setup/home-interface-kiosk.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable home-interface-kiosk.service
+step "Scheduling validated updates at 3:30 AM"
+CRON_JOB="30 3 * * * $APP_DIR/pi-setup/daily-update.sh"
+(
+    crontab -l 2>/dev/null | grep -v "daily-update.sh" || true
+    echo "$CRON_JOB"
+) | crontab -
 
-# Set up daily update cron job
-echo "Step 8: Setting up daily update cron job..."
-CRON_JOB="0 3 * * * /home/jordankeyser/Desktop/home-interface/pi-setup/daily-update.sh"
-(crontab -l 2>/dev/null | grep -v "daily-update.sh"; echo "$CRON_JOB") | crontab -
-
-# Configure auto-login (if not already done)
-echo "Step 9: Configuring auto-login..."
-if [ ! -f /etc/systemd/system/getty@tty1.service.d/autologin.conf ]; then
-    sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
-    echo "[Service]" | sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
-    echo "ExecStart=" | sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
-    echo "ExecStart=-/sbin/agetty --autologin jordankeyser --noclear %I \$TERM" | sudo tee -a /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null
+step "Quieting boot messages"
+CMDLINE="/boot/firmware/cmdline.txt"
+[[ -f "$CMDLINE" ]] || CMDLINE="/boot/cmdline.txt"
+if [[ -f "$CMDLINE" ]]; then
+    if ! grep -q "logo.nologo" "$CMDLINE"; then
+        sudo sed -i '1 s/$/ quiet loglevel=3 logo.nologo vt.global_cursor_default=0/' "$CMDLINE"
+    fi
+else
+    echo "  No cmdline.txt found; skipping."
 fi
 
-# Configure auto-startx in .bash_profile
-echo "Step 10: Configuring auto-start X server..."
-if ! grep -q "startx" /home/jordankeyser/.bash_profile 2>/dev/null; then
-    cat >> /home/jordankeyser/.bash_profile << 'EOF'
-
-# Auto-start X server on login (tty1 only)
-if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
-    startx
-fi
-EOF
-fi
-
-# Hide boot messages by configuring /boot/cmdline.txt
-echo "Step 11: Configuring boot parameters..."
-if ! grep -q "quiet splash" /boot/cmdline.txt 2>/dev/null; then
-    sudo sed -i '$ s/$/ quiet splash loglevel=3 logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
-fi
-
-# Create .xinitrc to auto-start the kiosk
-echo "Step 12: Creating .xinitrc..."
-cat > /home/jordankeyser/.xinitrc << 'EOF'
-#!/bin/bash
-# Start the kiosk on X server launch
-exec /home/jordankeyser/Desktop/home-interface/pi-setup/kiosk-start.sh
-EOF
-chmod +x /home/jordankeyser/.xinitrc
-
-echo ""
+echo
 echo "========================================="
-echo "Installation Complete!"
+echo " Setup complete"
 echo "========================================="
-echo ""
-echo "Configuration saved. To start the kiosk:"
-echo "1. Option A: Reboot the Pi: sudo reboot"
-echo "2. Option B: Start manually: startx"
-echo ""
-echo "The kiosk will automatically:"
-echo "- Start on boot"
-echo "- Pull updates daily at 3 AM"
-echo "- Restart if it crashes"
-echo ""
-echo "Useful commands:"
-echo "- View logs: tail -f /home/jordankeyser/Desktop/home-interface/logs/vite.log"
-echo "- View update logs: tail -f /home/jordankeyser/Desktop/home-interface/logs/update.log"
-echo "- Stop kiosk: sudo systemctl stop home-interface-kiosk"
-echo "- Check status: sudo systemctl status home-interface-kiosk"
-echo ""
-echo "To exit the kiosk once running, press: Alt+F4"
-echo ""
-
+echo
+echo "Reboot once so the repaired labwc session owns the kiosk:"
+echo "  sudo reboot"
+echo
+echo "Logs:"
+echo "  $HOME/.local/state/home-interface/kiosk.log"
+echo "  $HOME/.local/state/home-interface/vite.log"
+echo
+echo "If startup still fails:"
+echo "  $APP_DIR/pi-setup/diagnose-kiosk.sh"

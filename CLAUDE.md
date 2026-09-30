@@ -32,22 +32,20 @@ features and theming.
 ## How the panel runs
 
 - Repo on the Pi: `/home/jordankeyser/Desktop/home-interface`.
-- `pi-setup/kiosk-start.sh` starts the **Vite dev server** (`npm start`, port
-  5173) and then Chromium in kiosk mode at `http://localhost:5173`. It's run
-  by the `home-interface-kiosk.service` systemd unit (installed by
-  `pi-setup/install.sh`). The panel runs the dev server, not a production
-  build.
+- `pi-setup/kiosk-start.sh` starts the **Vite dev server** on
+  `127.0.0.1:5173`, verifies the correct HTML, and then starts Chromium. It is
+  launched exactly once by `~/.config/labwc/autostart`. A kiosk systemd unit
+  and `~/.xinitrc` are unsupported duplicate launch paths; the one-time
+  `pi-setup/repair-wayland-kiosk.sh` removes them.
 - The script also calls `xset` and `unclutter`, which are X11 tools. Under
   labwc they probably do nothing; this hasn't been checked.
 - `server/displayServer.js` (optional, port 3001, loopback only) cuts the
   backlight on sleep and handles shutdown. It runs as its own unit,
   `home-interface-display.service`.
-- **Updates:** cron runs `pi-setup/daily-update.sh` nightly. `install.sh`
-  schedules it for 3:00 AM, while the README says 3:30; `crontab -l` on the
-  Pi is the truth. The script fast-forwards `main` from GitHub, and Vite's
-  file watcher reloads the page. Run it by hand from the repo folder with
-  `./pi-setup/daily-update.sh`, followed by `sudo reboot` if the panel
-  doesn't pick up the change.
+- **Updates:** cron runs `pi-setup/daily-update.sh` at 3:30 AM. The script
+  fast-forwards `main`, installs changed dependencies, validates lint/build,
+  rolls back a failed validation, and cold-reboots after a successful update.
+  HMR is disabled on the kiosk so revisions are never mixed in a live page.
 - **Never put files inside the repo folder on the Pi.** A dirty tree blocks the
   update, and `daily-update.sh --force` runs `git reset --hard && git clean -fd`,
   which deletes anything untracked.
@@ -231,9 +229,5 @@ designed. Why the rewrites rendered white was never identified.
 
 ## Known loose ends
 
-- The README is partly stale: it mentions a stock ticker, `server/index.js`,
-  `npm run server` and a production mode, none of which match the current code.
 - The Home Assistant token sits in `localStorage` on the panel. That's
   acceptable for a single-user, loopback-only kiosk.
-- `kiosk-start.sh` still waits for internet (it pings 8.8.8.8) before starting,
-  even though the weather and CTA need the network and Home Assistant doesn't.

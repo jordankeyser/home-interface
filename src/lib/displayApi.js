@@ -1,17 +1,16 @@
 /**
  * Client for `server/displayServer.js`.
  *
- * Absolute URLs to localhost:3001, matching how this always worked: the display
- * server sets `Access-Control-Allow-Origin: *`, and Vite's dev config proxies
- * only `/api`, so relative paths would hit Vite and return the HTML shell.
+ * Absolute URLs to localhost:3001 match the Pi's two-process runtime. The
+ * display server allows only loopback dashboard origins; Vite proxies only
+ * `/api`, so relative display paths would hit Vite and return the HTML shell.
  *
  * Only the three endpoints displayServer.js actually implements are exposed.
  * Brightness levels and reboot are deliberately absent — it has no such routes,
  * and a control that silently does nothing is worse than no control.
  *
- * Note the display server is not started by any of the pi-setup scripts. Until
- * it is running, these calls fail softly and sleep is visual only (the panel
- * blacks out but the backlight stays lit).
+ * The optional install-display-server.sh script starts it as a separate unit.
+ * Until it is installed, calls fail softly and sleep is visual only.
  */
 
 // 127.0.0.1, not "localhost": the server binds IPv4 loopback, and "localhost"
