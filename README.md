@@ -107,6 +107,8 @@ Everything is configured from the gear icon on the panel and stored in
 | CTA API key | [transitchicago.com/developers](https://www.transitchicago.com/developers/) |
 | Station ID | 5-digit station MapID (e.g. `40380`) |
 | Zip code | Weather location. No key needed — Open-Meteo is free |
+| Home Assistant address | Defaults to `http://127.0.0.1:8123` (same Pi) |
+| Home Assistant token | Long-lived access token — HA profile → Security |
 | Quote provider | Finnhub (60 req/min free) or Alpha Vantage (25 req/**day**) |
 | Stock API key | [finnhub.io/register](https://finnhub.io/register) |
 | Symbols | Comma-separated, up to 12 tickers |
@@ -126,6 +128,28 @@ cannot sustain a live ticker.
 - **Trains** — [CTA Train Tracker](https://www.transitchicago.com/developers/)
 - **Quotes** — [Finnhub](https://finnhub.io/) or
   [Alpha Vantage](https://www.alphavantage.co/)
+
+## Smart home (Home Assistant)
+
+Swipe left from the main screen for a second page of lights, switches and fans,
+grouped by the rooms (areas) you set up in Home Assistant. Tap a tile to toggle
+it; dimmable lights have a brightness button. Devices you add to Home Assistant
+later appear on their own.
+
+Home Assistant runs on the same Pi, in Docker, from `~/homeassistant/compose.yml`
+— outside this repo on purpose, since the nightly update discards anything it
+doesn't recognise here. Update it with:
+
+```bash
+sudo docker compose -f ~/homeassistant/compose.yml pull && sudo docker compose -f ~/homeassistant/compose.yml up -d
+```
+
+The panel talks to Home Assistant's WebSocket API directly (no proxy). The
+connection is held while the panel is awake and dropped while it sleeps; if
+Home Assistant goes down the page keeps the last known state, disables the
+controls and reconnects on its own. Supported device types are listed in
+`src/lib/haEntities.js` — adding one is an entry there plus an icon in
+`DeviceTile.jsx`.
 
 ## Raspberry Pi kiosk
 

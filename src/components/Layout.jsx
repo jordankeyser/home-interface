@@ -62,12 +62,9 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
         <Ambience />
 
         {/* animate-shift creeps the whole panel ~2px over 15 minutes so an
-            always-on wall display never holds one pixel value all day. */}
-        <main className="relative z-10 h-full w-full animate-shift p-4">
-          <div className="mx-auto grid h-full min-h-0 w-full max-w-[1500px] grid-cols-1 gap-4 md:grid-cols-[42%_58%]">
-            {children}
-          </div>
-        </main>
+            always-on wall display never holds one pixel value all day.
+            Pages bring their own padding so swiping moves them edge to edge. */}
+        <main className="relative z-10 h-full w-full animate-shift">{children}</main>
       </div>
 
       {/* Mounted only while open, so its form state initialises from settings

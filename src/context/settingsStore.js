@@ -12,6 +12,9 @@ export const DEFAULT_SETTINGS = {
   ctaApiKey: '',
   ctaStationId: '40380',
   zipCode: '60601',
+  /** Home Assistant runs on the same Pi as the kiosk. */
+  haUrl: 'http://127.0.0.1:8123',
+  haToken: '',
   /** Minutes of inactivity before the panel sleeps. 0 disables sleep. */
   idleSleepMinutes: 3,
   /** Preview the 1024x600 panel while developing on a desktop browser. */
