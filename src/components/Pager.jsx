@@ -7,7 +7,6 @@ const SWIPE_FRACTION = 0.18;
 const FLICK_VELOCITY = 0.45;
 /** Movement before we decide whether a gesture is a swipe or a tap/scroll. */
 const SLOP_PX = 12;
-const SETTLE = 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1)';
 
 /**
  * Full-screen pages you swipe between. Every page stays mounted, so swiping
@@ -21,6 +20,11 @@ const SETTLE = 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1)';
  * leaves vertical list scrolling to the browser and hands horizontal drags
  * to us.
  *
+ * Pages move by setting scrollLeft on an overflow-hidden row, not with a
+ * transform. The panel went blank white with a transformed (GPU-promoted)
+ * track holding every glass card — most likely the Pi 4 running out of GPU
+ * tile memory — while this scroll path is one it's known to draw correctly.
+ *
  * The dots are an indicator, not controls — at 6px they'd be far below the
  * 48px tap-target floor, and swiping is the gesture. Arrow keys also page, for
  * desktop testing.
@@ -28,7 +32,7 @@ const SETTLE = 'transform 320ms cubic-bezier(0.22, 1, 0.36, 1)';
 const Pager = ({ children }) => {
   const pages = Children.toArray(children);
   const count = pages.length;
-  const trackRef = useRef(null);
+  const scrollerRef = useRef(null);
   const dragRef = useRef(null);
   const suppressClickRef = useRef(false);
   const [index, setIndex] = useState(0);
@@ -43,21 +47,31 @@ const Pager = ({ children }) => {
     if (isAsleep) setIndex(0);
   }
 
-  /** Positions the track at the current page, offset by a live drag. */
+  /** Scrolls to the current page, offset by a live drag. */
   const place = (offsetPx, animate) => {
-    const el = trackRef.current;
+    const el = scrollerRef.current;
     if (!el) return;
-    el.style.transition = animate ? SETTLE : 'none';
-    el.style.transform = `translate3d(calc(${-index * 100}% + ${offsetPx}px), 0, 0)`;
+    el.scrollTo({
+      left: index * el.clientWidth - offsetPx,
+      behavior: animate ? 'smooth' : 'instant',
+    });
   };
 
-  // Transform is managed here rather than in the style prop, so a drag can
-  // move the track every frame without re-rendering the dashboard.
   useLayoutEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.style.transition = SETTLE;
-    el.style.transform = `translate3d(${-index * 100}%, 0, 0)`;
+    const el = scrollerRef.current;
+    el?.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' });
+  }, [index]);
+
+  // Keep the page aligned if the viewport changes size (the desktop
+  // 7-inch-panel preview toggles it).
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(() =>
+      el.scrollTo({ left: index * el.clientWidth, behavior: 'instant' })
+    );
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [index]);
 
   useEffect(() => {
@@ -114,9 +128,8 @@ const Pager = ({ children }) => {
     d.lastX = e.clientX;
     d.lastT = e.timeStamp;
 
-    // Rubber-band past the first and last page instead of stopping dead.
-    const pastEdge = (index === 0 && dx > 0) || (index === count - 1 && dx < 0);
-    place(pastEdge ? dx / 3 : dx, false);
+    // scrollLeft clamps at the first and last page on its own.
+    place(dx, false);
   };
 
   const onPointerUp = (e) => {
@@ -152,15 +165,16 @@ const Pager = ({ children }) => {
 
 
   return (
-    <div
-      className="pager relative h-full w-full"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerCancel}
-      onClickCapture={onClickCapture}
-    >
-      <div ref={trackRef} className="pager-track h-full w-full">
+    <div className="relative h-full w-full">
+      <div
+        ref={scrollerRef}
+        className="pager h-full w-full"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+        onClickCapture={onClickCapture}
+      >
         {pages.map((page, i) => (
           <section key={page.key ?? i} className="h-full p-4">
             {page}
