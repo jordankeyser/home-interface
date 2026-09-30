@@ -124,10 +124,12 @@ they're stored in the browser's `localStorage`. The address defaults to
 | File | Role |
 | --- | --- |
 | `src/lib/homeAssistantClient.js` | WebSocket client: auth, `get_states`, `state_changed` subscription, area/device/entity registries (refetched on registry events), `call_service`, and a one-shot `testHomeAssistant` |
-| `src/hooks/useHomeAssistant.js` | Connection lifecycle (open while awake, closed while asleep), grouping by room, optimistic toggles that revert if HA doesn't confirm within 6 s |
+| `src/hooks/useHomeAssistant.js` | Connection lifecycle (open while awake, closed while asleep), grouping by room, optimistic updates that revert if HA doesn't confirm within 6 s, and the actions: toggle, brightness, warmth, colour, and `setPower` for many devices at once |
+| `src/context/HomeAssistantContext.jsx` | Runs that hook **once** for the whole panel. Components call `useHomeAssistant()`, which reads the context; never call `useHomeAssistantConnection` a second time, or you open a second WebSocket |
 | `src/lib/haEntities.js` | Which device types are shown (`DOMAINS`: light, switch, fan) and how they're read |
-| `src/components/modules/Devices/` | Devices page, tiles, brightness sheet |
-| `src/components/Pager.jsx` | Swipe between the trains/weather page and the devices page |
+| `src/components/modules/Devices/` | Devices page (device list on the left, All on / All off on the right), tiles, and the light sheet (brightness, warmth, colour) |
+| `src/components/LightsShortcut.jsx` | "3 on" button in the clock card; jumps to the devices page |
+| `src/components/Pager.jsx` | Swipe between the trains/weather page and the devices page. `PagerContext` (`src/context/pagerStore.js`) gives buttons a `goTo(page)` |
 
 - **Protocol details:**
   - A rejected token stops reconnecting on purpose, so it doesn't pile up
@@ -136,12 +138,29 @@ they're stored in the browser's `localStorage`. The address defaults to
     entity id, `di` the device id, `ai` the area id, `ec` the entity category
     and `hb` the hidden flag.
   - An entity takes its device's area unless it has its own.
+- **All on, All off and the room buttons act on lights only**, on purpose:
+  switching every plug on at once could start a heater. A room gets a
+  button only when it has two or more lights; with one, the tile is the
+  switch.
+- **Warmth and colour** show only when the bulb reports `color_temp` or a
+  colour mode in `supported_color_modes`. Presets are pulled into the bulb's
+  own `min/max_color_temp_kelvin`.
 - **Adding a device type:** add an entry to `DOMAINS` in `haEntities.js` and an
   icon in `DeviceTile.jsx`. Anything beyond on/off plus brightness (climate,
   covers, locks) needs its own controls.
 - **Later hardware:** Zigbee needs a USB radio plus the built-in ZHA
   integration. Matter, Thread and Z-Wave need extra containers, because
   Container installs don't get Home Assistant's add-ons.
+
+## Train arrivals
+
+- CTA times (`arrT`, `tmst`) are Chicago wall-clock strings with no offset.
+  `useCTA` gives every train a `dueAt` on this device's clock: the gap between
+  `arrT` and the response's own `tmst`, added to the moment the response
+  arrived. That makes countdowns right even if the Pi's timezone or clock is
+  wrong. Don't go back to comparing `new Date(arrT)` with `Date.now()`.
+- `TrainModule` counts from `max(tick, lastUpdated)`, never from a tick that
+  predates the latest fetch (see the incident log).
 
 ## Developing
 
@@ -200,6 +219,10 @@ is enough to exercise the devices page without the real Pi.
 - **Deploy:** commit to `main` and push. That's what the Pi pulls, and all
   history is on `main`. Then have the owner run `./pi-setup/daily-update.sh`
   on the Pi, or wait for the nightly run.
+- After an update that adds or reorders React hooks, or adds a context
+  provider, **reboot the panel** (`sudo reboot`). Vite hot-swaps changed files
+  into the running page, and a half-applied hook change can crash React until
+  the page is reloaded.
 - **Roll back:** revert on `main` and push (for example
   `git revert --no-commit <good>..HEAD`), then update the Pi. Don't reset the
   Pi's checkout by hand; the next nightly update would fast-forward it again.
@@ -223,7 +246,13 @@ straight from boot. They were rolled back: `6cfbc73` reverted everything, then
 (see Touchscreen), not the code. Once it was turned off, `601c547` worked as
 designed. Why the rewrites rendered white was never identified.
 
-**Lessons:**
+**2026-09-30: trains briefly showing arrivals like "1123 min".** The
+countdown clock (`now`) stopped ticking while the panel slept. On waking, a
+fresh fetch arrived before the next 15 s tick, so new arrival times were
+measured against the time the panel fell asleep, often many hours earlier.
+Fixed by anchoring to the fetch time (see Train arrivals).
+
+**Lessons from the white-panel incident:**
 - Get device facts first: `xinput list`, the labwc config, Chromium's
   launch flags.
 - Make one change at a time, and have it tested on the panel before the next.

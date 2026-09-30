@@ -32,13 +32,13 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
   const pct = on && dimmable ? brightnessPct(entity) : null;
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       <button
         type="button"
         onClick={() => onToggle(entity)}
         disabled={disabled || unavailable}
         aria-pressed={on}
-        className="card-inset card-inset-hover flex min-h-[112px] w-full flex-col items-start justify-between gap-3 p-3.5 text-left transition-transform duration-150 active:scale-[0.98] disabled:opacity-45"
+        className="card-inset card-inset-hover flex h-full min-h-[112px] w-full flex-col items-start justify-between gap-3 p-3.5 text-left transition-transform duration-150 active:scale-[0.98] disabled:opacity-45"
         style={on ? LIT_TILE : undefined}
       >
         <span
@@ -53,7 +53,7 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
         </span>
 
         <span className={`w-full min-w-0 ${dimmable ? 'pr-1' : ''}`}>
-          <span className="block truncate text-base font-semibold text-fg">{name}</span>
+          <span className="line-clamp-2 block text-base leading-snug font-semibold text-fg">{name}</span>
           <span className="nums block text-sm text-fg-muted">{statusText(entity)}</span>
         </span>
       </button>
