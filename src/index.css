@@ -66,8 +66,6 @@
   --negative: #fb7185;
   --warning: #fbbf24;
   --danger: #f87171;
-  /* A light that's on — warm, so a lit tile reads as a lamp, not an alert. */
-  --lamp: #fbbf24;
 
   /* Elevation — one soft shadow, not three stacked insets */
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.05) inset,
@@ -107,7 +105,6 @@
   --negative: #dc2626;
   --warning: #b45309;
   --danger: #dc2626;
-  --lamp: #d97706;
 
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.9) inset,
     0 14px 36px -14px rgb(15 23 42 / 0.28);
@@ -140,7 +137,6 @@
   --color-negative: var(--negative);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --color-lamp: var(--lamp);
 
   /* Type scale tuned for a wall panel read from 6–10 feet.
      Nothing in the UI is allowed below --text-xs (13px). */
@@ -581,40 +577,13 @@ textarea {
   user-select: text;
 }
 
-/* Native momentum scrolling — do not reimplement this in JS.
-   Horizontal panning stays allowed (and only the y axis is contained) so a
-   sideways swipe that starts on a list still reaches the page pager. */
+/* Native momentum scrolling — do not reimplement this in JS. */
 .scroll-y {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
-  touch-action: pan-x pan-y;
-}
-
-/* Swipe between full-screen pages. Native scroll snapping rather than JS drag
-   handling: the compositor tracks the finger, which is what keeps it smooth on
-   a Pi. `contain` stops a hard fling at the last page from doing anything
-   beyond it. */
-.pager {
-  display: flex;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  overscroll-behavior-x: contain;
-  touch-action: pan-x pan-y;
-  scrollbar-width: none;
-}
-
-.pager::-webkit-scrollbar {
-  display: none;
-}
-
-.pager > * {
-  flex: 0 0 100%;
-  min-width: 0;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 
 /* Thick enough to grab with a fingertip. */

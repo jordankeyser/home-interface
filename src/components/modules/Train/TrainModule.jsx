@@ -1,104 +1,59 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useCTA } from '../../../hooks/useCTA';
 import { useDisplay } from '../../../hooks/useDisplay';
-import { RefreshIcon, WarningIcon, TrainIcon } from '../../icons';
+import {
+  RefreshIcon,
+  PauseIcon,
+  PlayIcon,
+  ChevronDownIcon,
+  WarningIcon,
+  TrainIcon,
+} from '../../icons';
 
-/** Official CTA line colours and names, keyed by the API's route codes. */
-const LINES = {
-  Red: { name: 'Red Line', color: '#c60c30' },
-  Blue: { name: 'Blue Line', color: '#00a1de' },
-  Brn: { name: 'Brown Line', color: '#62361b' },
-  G: { name: 'Green Line', color: '#009b3a' },
-  Org: { name: 'Orange Line', color: '#f9461c' },
-  P: { name: 'Purple Line', color: '#522398' },
-  Pink: { name: 'Pink Line', color: '#e27ea6' },
-  Y: { name: 'Yellow Line', color: '#f9e300' },
+/** Official CTA line colours, keyed by the API's route codes. */
+const LINE_COLORS = {
+  Red: '#c60c30',
+  Blue: '#00a1de',
+  Brn: '#62361b',
+  G: '#009b3a',
+  Org: '#f9461c',
+  P: '#522398',
+  Pink: '#e27ea6',
+  Y: '#f9e300',
 };
 
-/** Arrivals after the first one, shown as "then 7, 15 min". */
-const FOLLOWING = 2;
-
-/** A train this far past its arrival time has left; stop showing it. */
-const DEPARTED_MS = 60_000;
-
-/** "Service toward Loop" → "Toward Loop"; the heading doesn't need the preamble. */
-const directionLabel = (stpDe) => stpDe.replace(/^service\s+/i, '');
-
-const minutesUntil = (train, now) => Math.round((train.dueAt - now) / 60_000);
-
-const isDue = (train, now) => train.isApp === '1' || minutesUntil(train, now) <= 0;
-
-/**
- * One line and destination: the next train large, the ones after it small.
- * A transit board is read from across the room, so the next arrival is the
- * only number that has to be legible at a glance.
- */
-const RouteRow = ({ trains, now }) => {
-  const [next, ...rest] = trains;
-  const line = LINES[next.rt];
-  const due = isDue(next, now);
-  const mins = minutesUntil(next, now);
-  const later = rest.slice(0, FOLLOWING).map((t) => Math.max(1, minutesUntil(t, now)));
-
-  const notes = [line?.name ?? next.rt];
-  if (later.length > 0) notes.push(`then ${later.join(', ')} min`);
-
-  return (
-    <div className="card-inset flex min-h-[60px] items-center gap-3.5 py-2 pr-4 pl-3">
-      <span
-        className="h-11 w-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: line?.color ?? 'var(--fg-faint)' }}
-      />
-
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-lg leading-tight font-semibold text-fg">{next.destNm}</div>
-        <div className="nums flex min-w-0 items-center gap-2 text-sm leading-snug text-fg-muted">
-          <span className="truncate">{notes.join(' · ')}</span>
-          {next.isDly === '1' && (
-            <span className="shrink-0 font-semibold text-warning">Delayed</span>
-          )}
-        </div>
-      </div>
-
-      <div className="shrink-0 text-right">
-        {due ? (
-          <span className="text-2xl font-bold text-accent">Due</span>
-        ) : (
-          <span className="nums text-3xl leading-none font-semibold text-fg">
-            {mins}
-            <span className="ml-1 text-sm font-medium text-fg-muted">min</span>
-          </span>
-        )}
-        {/* Scheduled arrivals are the timetable, not a tracked train. */}
-        {next.isSch === '1' && (
-          <div className="mt-0.5 text-xs font-medium text-fg-faint">Scheduled</div>
-        )}
-      </div>
-    </div>
-  );
-};
+const COLLAPSED_ROWS = 3;
+const EXPANDED_ROWS = 6;
 
 const TrainModule = () => {
-  const { arrivals, loading, error, stale, lastUpdated, refresh, stationName } = useCTA();
+  const {
+    arrivals,
+    loading,
+    error,
+    stale,
+    lastUpdated,
+    refresh,
+    stationName,
+    isPaused,
+    togglePause,
+  } = useCTA();
   const { isAsleep } = useDisplay();
-  const [tick, setTick] = useState(() => Date.now());
 
-  // Countdowns stay accurate between fetches. The first tick fires straight
-  // away so waking the panel never computes against the time it fell asleep.
+  const [expanded, setExpanded] = useState(() => new Set());
+  const [now, setNow] = useState(() => Date.now());
+
+  // Countdowns stay accurate between fetches. setState here is inside an
+  // interval callback, which is the supported pattern.
   useEffect(() => {
     if (isAsleep) return undefined;
-    const update = () => setTick(Date.now());
-    const first = setTimeout(update, 0);
-    const id = setInterval(update, 15_000);
-    return () => {
-      clearTimeout(first);
-      clearInterval(id);
-    };
+    const id = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(id);
   }, [isAsleep]);
 
-  // Never count from before the latest fetch. After a long sleep `tick` can
-  // be hours old for a moment, which is what turned "4 min" into "1123 min".
-  const now = Math.max(tick, lastUpdated?.getTime() ?? 0);
+  const minutesUntil = (arrT) => {
+    const mins = Math.round((new Date(arrT).getTime() - now) / 60_000);
+    return mins <= 0 ? null : mins;
+  };
 
   // Mon–Thu the Loop platform matters most; Fri–Sun it's the other direction.
   const loopFirst = useMemo(() => {
@@ -106,33 +61,36 @@ const TrainModule = () => {
     return day >= 1 && day <= 4;
   }, [now]);
 
-  const directions = useMemo(() => {
+  const groups = useMemo(() => {
     const byDirection = new Map();
 
-    arrivals
-      .filter((train) => train.dueAt > now - DEPARTED_MS)
-      .sort((a, b) => a.dueAt - b.dueAt)
-      .forEach((train) => {
-        const direction = train.stpDe || train.destNm;
-        if (!byDirection.has(direction)) byDirection.set(direction, new Map());
-        const routes = byDirection.get(direction);
-        const route = `${train.rt}\n${train.destNm}`;
-        if (!routes.has(route)) routes.set(route, []);
-        routes.get(route).push(train);
-      });
+    arrivals.forEach((train) => {
+      const key = train.stpDe || train.destNm;
+      if (!byDirection.has(key)) byDirection.set(key, []);
+      byDirection.get(key).push(train);
+    });
 
-    // Routes inside a direction come out in order of their next arrival,
-    // because the trains were sorted before grouping.
-    return [...byDirection.entries()]
-      .map(([direction, routes]) => ({ direction, routes: [...routes.values()] }))
-      .sort((a, b) => {
-        const aLoop = a.direction.toLowerCase().includes('loop');
-        const bLoop = b.direction.toLowerCase().includes('loop');
-        if (aLoop === bLoop) return 0;
-        if (loopFirst) return aLoop ? -1 : 1;
-        return aLoop ? 1 : -1;
-      });
-  }, [arrivals, now, loopFirst]);
+    const entries = [...byDirection.entries()];
+    entries.forEach(([, trains]) =>
+      trains.sort((a, b) => new Date(a.arrT) - new Date(b.arrT))
+    );
+
+    return entries.sort((a, b) => {
+      const aLoop = a[0].toLowerCase().includes('loop');
+      const bLoop = b[0].toLowerCase().includes('loop');
+      if (aLoop === bLoop) return 0;
+      if (loopFirst) return aLoop ? -1 : 1;
+      return aLoop ? 1 : -1;
+    });
+  }, [arrivals, loopFirst]);
+
+  const toggle = (direction) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(direction)) next.delete(direction);
+      else next.add(direction);
+      return next;
+    });
 
   if (loading && arrivals.length === 0) {
     return (
@@ -159,31 +117,42 @@ const TrainModule = () => {
 
   return (
     <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
-      <div className="mb-2 flex shrink-0 items-center justify-between gap-3 pl-1">
+      <div className="mb-1.5 flex shrink-0 items-center justify-between gap-3">
         <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
           <TrainIcon className="h-6 w-6 shrink-0 text-accent" />
           <span className="truncate">{stationName || 'Arrivals'}</span>
         </h2>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-0.5">
           {stale ? (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-warning">
+            <span className="text-warning" title="Showing last known arrivals">
               <WarningIcon className="h-4 w-4" />
-              Offline
             </span>
           ) : (
             lastUpdated && (
-              <span className="nums text-xs text-fg-faint">
-                Updated{' '}
-                {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              <span className="nums mr-1 hidden text-xs text-fg-faint md:block">
+                {lastUpdated.toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
               </span>
             )
           )}
 
           <button
             type="button"
+            onClick={togglePause}
+            className="icon-btn"
+            data-state={isPaused ? 'on' : 'off'}
+            aria-label={isPaused ? 'Resume updates' : 'Pause updates'}
+          >
+            {isPaused ? <PlayIcon className="h-5 w-5" /> : <PauseIcon className="h-5 w-5" />}
+          </button>
+
+          <button
+            type="button"
             onClick={refresh}
-            disabled={loading}
+            disabled={loading || isPaused}
             className="icon-btn"
             aria-label="Refresh arrivals"
           >
@@ -192,22 +161,88 @@ const TrainModule = () => {
         </div>
       </div>
 
-      {/* Native scrolling only: see "Touchscreen" in CLAUDE.md. */}
-      <div className="scroll-y train-scroll-mask min-h-0 flex-1 pr-1 pb-6">
-        {directions.length === 0 ? (
-          <div className="mt-12 text-center text-base text-fg-muted">No trains scheduled</div>
+      {/* Native scrolling — the previous version reimplemented touch scrolling
+          with preventDefault + manual scrollTop, which threw away momentum and
+          rubber-banding and made the list feel dead under a finger. */}
+      <div className="scroll-y train-scroll-mask min-h-0 flex-1 pr-1">
+        {groups.length === 0 ? (
+          <div className="mt-12 text-center text-base text-fg-muted">
+            No trains scheduled
+          </div>
         ) : (
           <div className="space-y-3">
-            {directions.map(({ direction, routes }) => (
-              <section key={direction}>
-                <h3 className="eyebrow mb-2 truncate px-1">{directionLabel(direction)}</h3>
-                <div className="space-y-2">
-                  {routes.map((trains) => (
-                    <RouteRow key={`${trains[0].rt}-${trains[0].destNm}`} trains={trains} now={now} />
-                  ))}
+            {groups.map(([direction, trains]) => {
+              const isOpen = expanded.has(direction);
+              const limit = isOpen ? EXPANDED_ROWS : COLLAPSED_ROWS;
+              const hasMore = trains.length > COLLAPSED_ROWS;
+
+              return (
+                <div key={direction}>
+                  <button
+                    type="button"
+                    onClick={() => hasMore && toggle(direction)}
+                    disabled={!hasMore}
+                    className="mb-1.5 flex min-h-[40px] w-full items-center justify-between gap-2 rounded-xl px-1 text-left disabled:cursor-default"
+                    aria-expanded={isOpen}
+                    aria-label={`${isOpen ? 'Show fewer' : 'Show more'} trains toward ${direction}`}
+                  >
+                    <span className="eyebrow min-w-0 truncate">{direction}</span>
+                    {hasMore && (
+                      <ChevronDownIcon
+                        className={`h-5 w-5 shrink-0 text-fg-faint transition-transform duration-200 ${
+                          isOpen ? 'rotate-180' : ''
+                        }`}
+                      />
+                    )}
+                  </button>
+
+                  <div className="space-y-2">
+                    {trains.slice(0, limit).map((train) => {
+                      const mins = minutesUntil(train.arrT);
+                      const isDue = mins === null;
+                      const isApproaching = mins !== null && mins <= 2;
+
+                      return (
+                        <div
+                          key={train.rn}
+                          className="card-inset card-inset-hover flex items-center justify-between gap-3 px-3 py-2"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span
+                              className="h-6 w-1.5 shrink-0 rounded-full"
+                              style={{
+                                backgroundColor:
+                                  LINE_COLORS[train.rt] || 'var(--fg-faint)',
+                              }}
+                            />
+                            <span className="truncate text-base font-semibold text-fg">
+                              {train.destNm}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`nums shrink-0 text-right text-xl font-semibold ${
+                              isDue || isApproaching ? 'text-accent' : 'text-fg'
+                            }`}
+                          >
+                            {isDue ? (
+                              'Due'
+                            ) : (
+                              <>
+                                {mins}
+                                <span className="ml-1 text-sm font-medium text-fg-muted">
+                                  min
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </section>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
