@@ -4,6 +4,13 @@ import tailwindcss from '@tailwindcss/vite'
 import { createWifiManagerPlugin } from './server/wifiManager.js'
 
 const isKiosk = process.env.HOME_INTERFACE_KIOSK === '1'
+const ctaProxy = {
+  '/api': {
+    target: 'http://lapi.transitchicago.com',
+    changeOrigin: true,
+    rewrite: (path) => path.replace(/^\/api/, '/api')
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,12 +25,9 @@ export default defineConfig({
     // modules and left the screen white. The updater validates, then reboots;
     // the Mac dev server keeps normal HMR.
     hmr: isKiosk ? false : undefined,
-    proxy: {
-      '/api': {
-        target: 'http://lapi.transitchicago.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/api')
-      }
-    }
-  }
+    proxy: ctaProxy
+  },
+  preview: {
+    proxy: ctaProxy
+  },
 })

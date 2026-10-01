@@ -8,8 +8,7 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
 
   // Preview framing is desktop-only. A saved preview setting must never add a
   // second frame around the real kiosk viewport.
-  const isPiMode =
-    settings.isPiMode && import.meta.env.VITE_HOME_INTERFACE_KIOSK !== '1';
+  const isPiMode = settings.isPiMode && document.documentElement.dataset.kiosk !== 'true';
   const settingsOpen = isSettingsOpen ?? localOpen;
   const setSettingsOpen = setIsSettingsOpen || setLocalOpen;
 

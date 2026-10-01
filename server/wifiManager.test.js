@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDeviceStatus, parseNetworkList, parseTerseLine } from './wifiManager.js';
+import {
+  createWifiManagerPlugin,
+  parseDeviceStatus,
+  parseNetworkList,
+  parseTerseLine,
+} from './wifiManager.js';
 
 test('parseTerseLine respects escaped colons and backslashes', () => {
   assert.deepEqual(parseTerseLine('wlan0:wifi:connected:Kitchen\\: IoT'), [
@@ -34,4 +39,17 @@ test('parseNetworkList deduplicates SSIDs and keeps the strongest access point',
       { ssid: 'Guest', active: false, signal: 30, secure: false },
     ]
   );
+});
+
+test('Wi-Fi middleware is installed for development and production preview', () => {
+  const plugin = createWifiManagerPlugin();
+  const installed = [];
+  const server = { middlewares: { use: (middleware) => installed.push(middleware) } };
+
+  plugin.configureServer(server);
+  plugin.configurePreviewServer(server);
+
+  assert.equal(installed.length, 2);
+  assert.equal(typeof installed[0], 'function');
+  assert.equal(typeof installed[1], 'function');
 });

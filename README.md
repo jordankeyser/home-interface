@@ -35,13 +35,14 @@ npm run build
 
 ## Raspberry Pi runtime
 
-The deployed panel intentionally uses Vite on `127.0.0.1:5173`, because that
-is the runtime verified on the actual Pi and touchscreen. Chromium is launched
-once from the labwc user session by `pi-setup/kiosk-start.sh`.
+The deployed panel serves the validated production bundle with Vite Preview on
+`127.0.0.1:5173`. Chromium is launched once from the labwc user session by
+`pi-setup/kiosk-start.sh`.
 
 The launcher:
 
 - starts locally without waiting for the internet;
+- serves optimized production assets instead of React's development runtime;
 - refuses duplicate launchers with an atomic PID lock;
 - requires the correct Home Interface HTML before opening Chromium;
 - pins Vite to port 5173 instead of silently moving to another port;

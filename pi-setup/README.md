@@ -62,7 +62,7 @@ The supported sequence is:
 Raspberry Pi desktop
   -> labwc autostart
   -> pi-setup/kiosk-start.sh
-  -> Vite on 127.0.0.1:5173
+  -> validated production bundle on 127.0.0.1:5173
   -> verified Home Interface HTML
   -> Chromium kiosk
 ```
@@ -95,7 +95,7 @@ A healthy result has:
 
 - one `kiosk-start.sh` launch entry, in `~/.config/labwc/autostart`;
 - no enabled `home-interface-kiosk.service`;
-- one Vite listener on `127.0.0.1:5173`;
+- one UI listener on `127.0.0.1:5173`;
 - an HTML response containing `<title>Home Interface</title>`;
 - `mouseEmulation="no"` in the labwc touch configuration.
 

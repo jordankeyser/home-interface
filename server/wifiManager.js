@@ -215,40 +215,43 @@ const isAllowedRequest = (req) => {
   return loopback && (!origin || LOOPBACK_ORIGIN.test(origin));
 };
 
+const configureWifiMiddleware = (server) => {
+  server.middlewares.use(async (req, res, next) => {
+    const path = new URL(req.url || '/', 'http://127.0.0.1').pathname;
+    if (!path.startsWith(API_ROOT)) return next();
+
+    if (!isAllowedRequest(req)) {
+      sendJson(res, 403, { error: 'Wi-Fi controls are available only on this panel' });
+      return;
+    }
+
+    try {
+      if (req.method === 'GET' && path === `${API_ROOT}/status`) {
+        sendJson(res, 200, await getStatus());
+        return;
+      }
+      if (req.method === 'POST' && path === `${API_ROOT}/scan`) {
+        sendJson(res, 200, { networks: await scanNetworks() });
+        return;
+      }
+      if (req.method === 'POST' && path === `${API_ROOT}/connect`) {
+        if (!req.headers['content-type']?.startsWith('application/json')) {
+          sendJson(res, 415, { error: 'JSON is required' });
+          return;
+        }
+        sendJson(res, 200, await connectNetwork(await readJson(req)));
+        return;
+      }
+      sendJson(res, 404, { error: 'Not found' });
+    } catch (error) {
+      sendJson(res, 503, { error: error.message || 'Wi-Fi operation failed' });
+    }
+  });
+};
+
 export const createWifiManagerPlugin = () => ({
   name: 'home-interface-wifi-manager',
   apply: 'serve',
-  configureServer(server) {
-    server.middlewares.use(async (req, res, next) => {
-      const path = new URL(req.url || '/', 'http://127.0.0.1').pathname;
-      if (!path.startsWith(API_ROOT)) return next();
-
-      if (!isAllowedRequest(req)) {
-        sendJson(res, 403, { error: 'Wi-Fi controls are available only on this panel' });
-        return;
-      }
-
-      try {
-        if (req.method === 'GET' && path === `${API_ROOT}/status`) {
-          sendJson(res, 200, await getStatus());
-          return;
-        }
-        if (req.method === 'POST' && path === `${API_ROOT}/scan`) {
-          sendJson(res, 200, { networks: await scanNetworks() });
-          return;
-        }
-        if (req.method === 'POST' && path === `${API_ROOT}/connect`) {
-          if (!req.headers['content-type']?.startsWith('application/json')) {
-            sendJson(res, 415, { error: 'JSON is required' });
-            return;
-          }
-          sendJson(res, 200, await connectNetwork(await readJson(req)));
-          return;
-        }
-        sendJson(res, 404, { error: 'Not found' });
-      } catch (error) {
-        sendJson(res, 503, { error: error.message || 'Wi-Fi operation failed' });
-      }
-    });
-  },
+  configureServer: configureWifiMiddleware,
+  configurePreviewServer: configureWifiMiddleware,
 });

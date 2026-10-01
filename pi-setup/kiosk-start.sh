@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Home Interface launcher for Raspberry Pi OS (labwc / Wayland).
 #
-# This script intentionally serves the UI with Vite on port 5173. That is the
-# runtime proven on this panel. What it does *not* do is let several boot paths
-# start competing Vite and Chromium processes: repair-wayland-kiosk.sh installs
-# one labwc autostart entry, and the atomic lock below rejects duplicates.
+# This script serves the validated production bundle with Vite Preview on port
+# 5173. It does not let several boot paths start competing UI servers and
+# Chromium processes: repair-wayland-kiosk.sh installs one labwc autostart
+# entry, and the atomic lock below rejects duplicates.
 
 set -uo pipefail
 
@@ -140,15 +140,15 @@ start_vite() {
     # serve our HTML, strictPort makes the problem explicit instead of silently
     # moving Vite to 5174 while Chromium continues to open 5173.
     : >"$VITE_LOG"
-    log "starting Vite on 127.0.0.1:$UI_PORT"
-    HOME_INTERFACE_KIOSK=1 VITE_HOME_INTERFACE_KIOSK=1 "$NPM_BIN" run dev -- \
+    log "starting production UI on 127.0.0.1:$UI_PORT"
+    HOME_INTERFACE_KIOSK=1 "$NPM_BIN" run preview -- \
         --host 127.0.0.1 --port "$UI_PORT" --strictPort \
         >>"$VITE_LOG" 2>&1 &
     vite_pid=$!
 
     for _attempt in $(seq 1 60); do
         if serves_home_interface; then
-            log "Vite is serving Home Interface (pid $vite_pid)"
+            log "production UI is serving Home Interface (pid $vite_pid)"
             return 0
         fi
         if ! kill -0 "$vite_pid" 2>/dev/null; then
@@ -219,7 +219,7 @@ while true; do
         server_ok=1
         # A changing query bypasses a stale Chromium document cache without
         # changing the origin, so localStorage settings survive.
-        KIOSK_URL="$APP_URL/?boot=$(date +%s)"
+        KIOSK_URL="$APP_URL/?kiosk=1&boot=$(date +%s)"
     else
         KIOSK_URL="$ERROR_PAGE"
         log "showing the on-screen diagnostic while Vite is unavailable"
