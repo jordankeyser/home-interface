@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { useWeather } from '../../../hooks/useWeather';
-import WeatherBackdrop from './WeatherBackdrop';
 import {
   RefreshIcon,
   WindIcon,
@@ -12,26 +11,31 @@ import WeatherGlyph from './WeatherGlyph';
 import { weatherLabel } from '../../../lib/weatherCodes';
 
 const Stat = ({ icon: Icon, label, value, unit }) => (
-  <div className="flex flex-1 flex-col items-center gap-1">
-    <Icon className="h-5 w-5 text-fg-faint" />
-    <div className="nums text-base font-semibold text-fg">
-      {value}
-      {unit && <span className="ml-0.5 text-xs font-normal text-fg-muted">{unit}</span>}
+  <div className="flex min-w-0 items-center justify-center gap-1.5">
+    <Icon className="h-4 w-4 shrink-0 text-fg-faint" />
+    <div className="min-w-0 leading-tight">
+      <div className="nums whitespace-nowrap text-sm font-semibold text-fg">
+        {value}
+        {unit && <span className="ml-0.5 text-xs font-normal text-fg-muted">{unit}</span>}
+      </div>
+      <div className="truncate text-xs font-medium text-fg-faint">{label}</div>
     </div>
-    <div className="text-xs font-medium text-fg-faint">{label}</div>
   </div>
 );
+
+const hourLabel = (time, index) =>
+  index === 0
+    ? 'Now'
+    : new Date(time).toLocaleTimeString([], {
+        hour: 'numeric',
+      });
 
 const WeatherModule = () => {
   const { weather, locationName, loading, error, stale, refresh } = useWeather();
 
-  // Six columns is what actually fits this card's width at 1024x600 without
-  // scrolling. The previous version sliced 12 hours into a horizontally
-  // scrolling row with a fade at the edge — at this card's width the 7th item
-  // landed mid-column, so it read as visually cut off rather than "swipe for
-  // more" (nothing on a kiosk suggests that gesture). Fixed to a grid that
-  // exactly fills the width instead.
-  const HOURS_SHOWN = 6;
+  // Five equal columns fit the actual 800x480 panel without clipped labels or
+  // a second scroll gesture competing with the page swipe.
+  const HOURS_SHOWN = 5;
 
   const hourly = useMemo(() => {
     if (!weather?.hourly?.time) return [];
@@ -80,68 +84,60 @@ const WeatherModule = () => {
   const isDay = current.is_day !== 0;
 
   return (
-    <div className="card relative flex h-full w-full flex-col overflow-hidden">
-      <WeatherBackdrop code={current.weather_code} isDay={isDay} />
-
-      <button
-        type="button"
-        onClick={refresh}
-        disabled={loading}
-        className="icon-btn absolute top-3 right-3 z-20"
-        aria-label="Refresh weather"
-      >
-        <RefreshIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-      </button>
-
-      {/* Current conditions */}
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pt-6">
-        <div className="flex items-center gap-2 text-sm font-medium text-fg-muted">
-          <span className="truncate">{locationName}</span>
+    <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
+      <header className="flex min-h-12 shrink-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="truncate text-sm font-semibold text-fg-muted">{locationName}</h2>
           {stale && (
-            <span className="text-warning" title="Showing last known reading">
+            <span className="shrink-0 text-warning" title="Showing last known reading">
               <WarningIcon className="h-4 w-4" />
             </span>
           )}
         </div>
+        <button
+          type="button"
+          onClick={refresh}
+          disabled={loading}
+          className="icon-btn shrink-0"
+          aria-label="Refresh weather"
+        >
+          <RefreshIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </header>
 
-        <div className="mt-2 flex items-center gap-5">
-          <WeatherGlyph
-            code={current.weather_code}
-            isDay={isDay}
-            className="h-16 w-16 shrink-0 text-fg-muted"
-          />
-          <div className="nums text-7xl leading-none font-semibold tracking-tighter text-fg">
-            {Math.round(current.temperature_2m)}°
+      <div className="flex min-h-0 flex-1 items-center gap-2 py-1">
+        <WeatherGlyph
+          code={current.weather_code}
+          isDay={isDay}
+          className="h-12 w-12 shrink-0 text-fg-muted"
+        />
+        <div className="nums shrink-0 text-5xl leading-none font-semibold tracking-tighter text-fg">
+          {Math.round(current.temperature_2m)}°
+        </div>
+        <div className="min-w-0 pl-1">
+          <div className="truncate text-base font-semibold text-fg">
+            {weatherLabel(current.weather_code)}
           </div>
-        </div>
-
-        <div className="mt-3 text-lg font-medium text-fg">
-          {weatherLabel(current.weather_code)}
-        </div>
-
-        <div className="nums mt-1 flex items-center gap-3 text-sm text-fg-muted">
-          <span>H {Math.round(daily.temperature_2m_max[0])}°</span>
-          <span className="text-fg-faint">·</span>
-          <span>L {Math.round(daily.temperature_2m_min[0])}°</span>
-          <span className="text-fg-faint">·</span>
-          <span>Feels {Math.round(current.apparent_temperature)}°</span>
+          <div className="nums mt-1 flex flex-wrap gap-x-2 text-xs font-medium text-fg-muted">
+            <span>H {Math.round(daily.temperature_2m_max[0])}°</span>
+            <span>L {Math.round(daily.temperature_2m_min[0])}°</span>
+            <span>Feels {Math.round(current.apparent_temperature)}°</span>
+          </div>
         </div>
       </div>
 
-      {/* Hourly forecast + stats */}
-      <div className="relative z-10 shrink-0 px-3 pb-3">
-        <div className="divider mb-2" />
+      <div className="divider shrink-0" />
 
-        <div className="grid grid-cols-6 gap-1">
-          {hourly.map((hour) => (
+      <div className="grid shrink-0 grid-cols-5 gap-1 py-2">
+        {hourly.map((hour, index) => (
             <div
               key={hour.time}
-              className="flex flex-col items-center gap-1.5 rounded-xl py-1.5"
+              className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-1 ${
+                index === 0 ? 'bg-surface-hover' : ''
+              }`}
             >
-              <span className="text-xs font-medium text-fg-faint">
-                {new Date(hour.time)
-                  .toLocaleTimeString([], { hour: 'numeric' })
-                  .replace(' ', '')}
+              <span className="truncate text-xs font-medium text-fg-faint">
+                {hourLabel(hour.time, index)}
               </span>
               <WeatherGlyph code={hour.code} className="h-5 w-5 text-fg-muted" />
               <span className="nums text-sm font-semibold text-fg">
@@ -149,11 +145,10 @@ const WeatherModule = () => {
               </span>
             </div>
           ))}
-        </div>
+      </div>
 
-        <div className="divider my-2" />
-
-        <div className="flex items-start justify-around">
+      <div className="divider shrink-0" />
+      <div className="grid shrink-0 grid-cols-3 py-2">
           <Stat
             icon={WindIcon}
             label="Wind"
@@ -172,7 +167,6 @@ const WeatherModule = () => {
             value={current.precipitation.toFixed(2)}
             unit="in"
           />
-        </div>
       </div>
     </div>
   );

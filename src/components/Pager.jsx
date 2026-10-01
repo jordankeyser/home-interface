@@ -45,7 +45,7 @@ const Pager = ({ children }) => {
     <div className="relative h-full w-full">
       <div ref={trackRef} onScroll={onScroll} className="pager h-full w-full">
         {pages.map((page, i) => (
-          <section key={page.key ?? i} className="h-full p-4">
+          <section key={page.key ?? i} className="h-full p-3">
             {page}
           </section>
         ))}
@@ -59,7 +59,7 @@ const Pager = ({ children }) => {
           {pages.map((page, i) => (
             <span
               key={page.key ?? i}
-              className="h-1.5 rounded-full transition-all duration-300"
+              className="h-1.5 rounded-full transition-[width,background-color] duration-300"
               style={{
                 width: i === index ? '1.25rem' : '0.375rem',
                 backgroundColor: i === index ? 'var(--fg-muted)' : 'var(--line-strong)',

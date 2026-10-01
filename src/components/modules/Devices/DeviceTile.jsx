@@ -32,28 +32,30 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
   const pct = on && dimmable ? brightnessPct(entity) : null;
 
   return (
-    <div className="relative">
+    <div
+      className="card-inset overflow-hidden"
+      style={on ? LIT_TILE : undefined}
+    >
       <button
         type="button"
         onClick={() => onToggle(entity)}
         disabled={disabled || unavailable}
         aria-pressed={on}
-        className="card-inset card-inset-hover flex min-h-[112px] w-full flex-col items-start justify-between gap-3 p-3.5 text-left transition-transform duration-150 active:scale-[0.98] disabled:opacity-45"
-        style={on ? LIT_TILE : undefined}
+        className="card-inset-hover flex min-h-[92px] w-full items-center gap-2.5 p-2.5 text-left disabled:opacity-45"
       >
         <span
-          className="flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200"
           style={
             on
               ? { backgroundColor: 'var(--lamp)', color: '#1f1500' }
               : { backgroundColor: 'var(--surface)', color: 'var(--fg-muted)' }
           }
         >
-          <Icon className="h-6 w-6" />
+          <Icon className="h-5 w-5" />
         </span>
 
-        <span className={`w-full min-w-0 ${dimmable ? 'pr-1' : ''}`}>
-          <span className="block truncate text-base font-semibold text-fg">{name}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-fg">{name}</span>
           <span className="nums block text-sm text-fg-muted">{statusText(entity)}</span>
         </span>
       </button>
@@ -63,17 +65,12 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
           type="button"
           onClick={() => onAdjust(entity)}
           disabled={disabled}
-          className="icon-btn absolute top-2 right-2"
+          className="flex min-h-12 w-full items-center justify-center gap-2 border-t border-line px-3 text-sm font-semibold text-fg-muted active:bg-surface-hover disabled:opacity-45"
           aria-label={`Adjust ${name} brightness`}
         >
           <SlidersIcon className="h-5 w-5" />
+          <span>{pct === null ? 'Brightness' : `${pct}% brightness`}</span>
         </button>
-      )}
-
-      {pct !== null && (
-        <span className="pointer-events-none absolute inset-x-3.5 bottom-1.5 h-1 overflow-hidden rounded-full bg-line">
-          <span className="block h-full rounded-full bg-lamp" style={{ width: `${pct}%` }} />
-        </span>
       )}
     </div>
   );

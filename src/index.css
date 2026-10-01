@@ -39,61 +39,52 @@
   color-scheme: dark;
 
   /* Canvas */
-  --canvas: #06080d;
-  --canvas-2: #0b1017;
-  --glow-a: 0 171 255;
-  --glow-b: 139 92 246;
-  --glow-c: 34 211 238;
-  --glow-strength: 0.22;
+  --canvas: #08090b;
+  --canvas-2: #101216;
 
   /* Surfaces */
-  --surface: rgb(255 255 255 / 0.045);
-  --surface-hover: rgb(255 255 255 / 0.07);
-  --surface-active: rgb(255 255 255 / 0.1);
-  --surface-inset: rgb(0 0 0 / 0.25);
-  --line: rgb(255 255 255 / 0.09);
-  --line-strong: rgb(255 255 255 / 0.16);
+  --surface: #14161a;
+  --surface-hover: #1b1e23;
+  --surface-active: #22262c;
+  --surface-inset: #0e1013;
+  --line: rgb(255 255 255 / 0.08);
+  --line-strong: rgb(255 255 255 / 0.14);
 
   /* Text — three levels, nothing more */
-  --fg: #f3f6fa;
-  --fg-muted: #93a1b5;
-  --fg-faint: #5d6b7f;
+  --fg: #f6f7f8;
+  --fg-muted: #a0a4ad;
+  --fg-faint: #686e78;
 
   /* Accents */
-  --accent: #35b6ff;
-  --accent-fg: #04121c;
-  --positive: #34d399;
+  --accent: #5aa7ff;
+  --accent-fg: #06111d;
+  --positive: #30d158;
   --negative: #fb7185;
   --warning: #fbbf24;
   --danger: #f87171;
   /* A light that's on — warm, so a lit tile reads as a lamp, not an alert. */
-  --lamp: #fbbf24;
+  --lamp: #ffd166;
 
   /* Elevation — one soft shadow, not three stacked insets */
-  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.05) inset,
-    0 18px 48px -12px rgb(0 0 0 / 0.7);
+  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+    0 20px 44px -28px rgb(0 0 0 / 0.9);
 
   /* Glass — a bright top edge and a soft light source catching the upper-left
      of each surface, the way light catches a curved sheet of glass. */
-  --sheen-edge: rgb(255 255 255 / 0.16);
-  --sheen-glow: rgb(255 255 255 / 0.09);
-  --sheen-inner: rgb(255 255 255 / 0.05);
+  --sheen-edge: rgb(255 255 255 / 0.08);
+  --sheen-inner: rgb(255 255 255 / 0.025);
 }
 
 [data-theme='light'] {
   color-scheme: light;
 
-  --canvas: #eef1f6;
-  --canvas-2: #f8fafc;
-  --glow-a: 56 132 255;
-  --glow-b: 129 140 248;
-  --glow-c: 14 165 233;
-  --glow-strength: 0.14;
+  --canvas: #eef0f3;
+  --canvas-2: #fafbfc;
 
-  --surface: rgb(255 255 255 / 0.78);
-  --surface-hover: rgb(255 255 255 / 0.92);
-  --surface-active: rgb(255 255 255 / 1);
-  --surface-inset: rgb(15 23 42 / 0.045);
+  --surface: #ffffff;
+  --surface-hover: #f7f8fa;
+  --surface-active: #f1f3f5;
+  --surface-inset: #f3f4f6;
   --line: rgb(15 23 42 / 0.1);
   --line-strong: rgb(15 23 42 / 0.18);
 
@@ -110,10 +101,9 @@
   --lamp: #d97706;
 
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.9) inset,
-    0 14px 36px -14px rgb(15 23 42 / 0.28);
+    0 18px 38px -24px rgb(15 23 42 / 0.3);
 
   --sheen-edge: rgb(255 255 255 / 0.75);
-  --sheen-glow: rgb(255 255 255 / 0.55);
   --sheen-inner: rgb(255 255 255 / 0.35);
 }
 
@@ -200,36 +190,15 @@ body {
    Components — one confident surface, one hairline, one soft shadow.
    --------------------------------------------------------------------------- */
 @layer components {
-  /* Liquid-glass surface: a bright hairline along the top edge (light
-     catching the rim of a curved glass sheet), a soft glow in the upper-left
-     where that light pools, heavier blur/saturation so what's behind truly
-     reads through, and a taller corner radius for the rounder, more
-     continuous curve Apple's glass materials use. */
+  /* Opaque surfaces keep the visual language calm and render cheaply on the
+     wall panel. Shape, spacing and contrast provide the hierarchy. */
   .card {
     position: relative;
-    isolation: isolate;
-    border-radius: 1.75rem;
+    border-radius: 1.5rem;
     background-color: var(--surface);
     border: 1px solid var(--line);
-    box-shadow: var(--shadow-card), inset 0 1px 0 0 var(--sheen-edge),
-      inset 0 0 0 1px var(--sheen-inner);
-    backdrop-filter: blur(32px) saturate(165%);
-    -webkit-backdrop-filter: blur(32px) saturate(165%);
+    box-shadow: var(--shadow-card);
     transition: background-color 250ms ease, border-color 250ms ease;
-  }
-
-  .card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    border-radius: inherit;
-    background: radial-gradient(
-      120% 65% at 18% -12%,
-      var(--sheen-glow),
-      transparent 60%
-    );
-    pointer-events: none;
   }
 
   .card-inset {
@@ -245,9 +214,7 @@ body {
     background-color: var(--surface-hover);
   }
 
-  /* Every tappable control: 48px minimum, no exceptions. Visible as a glass
-     pill at rest — Apple's floating glass controls (Camera, Maps) are always
-     a frosted, lit shape, never fully invisible until touched. */
+  /* Every tappable control is at least 48px. */
   .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -259,8 +226,6 @@ body {
     background-color: var(--surface);
     border: 1px solid var(--line);
     box-shadow: inset 0 1px 0 0 var(--sheen-edge);
-    backdrop-filter: blur(20px) saturate(165%);
-    -webkit-backdrop-filter: blur(20px) saturate(165%);
     cursor: pointer;
     touch-action: manipulation;
     transition: background-color 150ms ease, color 150ms ease,
@@ -283,6 +248,52 @@ body {
   }
 
   .icon-btn[data-state='on'] {
+    color: var(--warning);
+  }
+
+  .icon-btn:focus-visible,
+  .btn:focus-visible,
+  .control-btn:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: 2px;
+  }
+
+  .control-group {
+    display: inline-flex;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 9999px;
+    background-color: var(--surface-inset);
+  }
+
+  .control-btn {
+    display: inline-flex;
+    min-width: 48px;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    color: var(--fg-muted);
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: background-color 150ms ease, color 150ms ease;
+  }
+
+  .control-btn + .control-btn {
+    border-left: 1px solid var(--line);
+  }
+
+  .control-btn:hover,
+  .control-btn:active {
+    background-color: var(--surface-hover);
+    color: var(--fg);
+  }
+
+  .control-btn:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .control-btn[data-state='on'] {
     color: var(--warning);
   }
 
@@ -309,8 +320,6 @@ body {
     cursor: pointer;
     touch-action: manipulation;
     box-shadow: inset 0 1px 0 0 var(--sheen-edge);
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
     transition: background-color 150ms ease, border-color 150ms ease,
       transform 150ms ease;
   }
@@ -355,6 +364,11 @@ body {
 
   .field::placeholder {
     color: var(--fg-faint);
+  }
+
+  .brightness-slider:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: 2px;
   }
 
   .label {
@@ -565,34 +579,14 @@ body {
   }
 }
 
-/* Raspberry Pi kiosk performance mode. The combination of continuously moving
-   blurred layers and backdrop-filter surfaces kept Chromium's GPU process near
-   a full CPU core even while the dashboard was idle. The Pi launcher sets the
-   data attribute before first paint; regular desktop previews keep all effects. */
+/* Raspberry Pi kiosk performance mode. The launcher sets the data attribute
+   before first paint. Motion stays disabled so the compositor only works when
+   the user interacts or live data changes. */
 html[data-kiosk='true'] *,
 html[data-kiosk='true'] *::before,
 html[data-kiosk='true'] *::after {
   animation: none !important;
   transition-duration: 0.01ms !important;
-}
-
-html[data-kiosk='true'] .card,
-html[data-kiosk='true'] .icon-btn,
-html[data-kiosk='true'] .btn {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-/* Large CSS blurs and isolated card layers are disproportionately expensive on
-   the Pi's 800x480 compositor. Keeping them on desktop preserves the intended
-   visual treatment; removing them in kiosk mode raises swipe rendering from
-   roughly 10 FPS to the display's full 60 FPS. */
-html[data-kiosk='true'] [class*='blur-'] {
-  display: none !important;
-}
-
-html[data-kiosk='true'] .card {
-  isolation: auto;
 }
 
 /* ---------------------------------------------------------------------------

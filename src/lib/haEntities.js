@@ -24,10 +24,12 @@ export const isOn = (entity) => entity.state === 'on';
 
 export const isUnavailable = (entity) => entity.state === 'unavailable';
 
-/** Dimmable lights report at least one colour mode other than plain on/off. */
+/** Support both modern color modes and older supported-feature reporting. */
 export const supportsBrightness = (entity) =>
   domainOf(entity.entity_id) === 'light' &&
-  (entity.attributes?.supported_color_modes || []).some((m) => m !== 'onoff');
+  ((entity.attributes?.supported_color_modes || []).some((m) => m !== 'onoff') ||
+    typeof entity.attributes?.brightness === 'number' ||
+    (Number(entity.attributes?.supported_features || 0) & 1) === 1);
 
 /** HA stores brightness as 0–255; people think in percent. */
 export const brightnessPct = (entity) => {

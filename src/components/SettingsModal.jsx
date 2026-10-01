@@ -16,6 +16,13 @@ import {
   PowerIcon,
 } from './icons';
 
+const SETTINGS_SECTIONS = [
+  { id: 'dashboard', label: 'Dashboard', detail: 'Weather and transit' },
+  { id: 'connections', label: 'Connections', detail: 'Wi-Fi and devices' },
+  { id: 'display', label: 'Display', detail: 'Theme and sleep' },
+  { id: 'system', label: 'System', detail: 'Power controls' },
+];
+
 const SecretField = ({ label, name, value, onChange, placeholder, hint }) => {
   const [visible, setVisible] = useState(false);
 
@@ -88,7 +95,7 @@ const Toggle = ({ label, hint, checked, onChange }) => (
       style={{ backgroundColor: checked ? 'var(--accent)' : 'var(--line-strong)' }}
     >
       <span
-        className="absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all duration-200"
+        className="absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-[left] duration-200"
         style={{ left: checked ? '1.625rem' : '0.25rem' }}
       />
     </span>
@@ -336,6 +343,7 @@ const SettingsModal = ({ onClose }) => {
   // setState-in-effect sync needed.
   const [form, setForm] = useState(settings);
   const [confirm, setConfirm] = useState(null);
+  const [activeSection, setActiveSection] = useState('dashboard');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -350,159 +358,222 @@ const SettingsModal = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-canvas">
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-line px-5 py-3">
-        <h2 className="text-xl font-semibold text-fg">Settings</h2>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={onClose} className="btn">
+    <div
+      className="fixed inset-0 z-50 flex flex-col bg-canvas"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="settings-title"
+    >
+      <header className="flex min-h-16 shrink-0 items-center justify-between gap-4 border-b border-line px-4 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="icon-btn shrink-0"
+            aria-label="Close settings without saving"
+          >
             <CloseIcon className="h-5 w-5" />
-            Cancel
           </button>
-          <button type="button" onClick={handleSave} className="btn btn-primary">
-            <CheckIcon className="h-5 w-5" />
-            Save
-          </button>
+          <div className="min-w-0">
+            <h2 id="settings-title" className="text-xl font-semibold text-fg">
+              Settings
+            </h2>
+            <p className="truncate text-xs text-fg-faint">Changes apply when you save</p>
+          </div>
         </div>
+        <button type="button" onClick={handleSave} className="btn btn-primary shrink-0">
+          <CheckIcon className="h-5 w-5" />
+          Save
+        </button>
       </header>
 
-      <div className="scroll-y min-h-0 flex-1 p-4">
-        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
-            <Section title="Transit">
-              <SecretField
-                label="CTA API key"
-                name="ctaApiKey"
-                value={form.ctaApiKey}
-                onChange={handleChange}
-                placeholder="Train Tracker API key"
-                hint="Request one at transitchicago.com/developers"
-              />
-              <Field
-                label="Station ID"
-                name="ctaStationId"
-                value={form.ctaStationId}
-                onChange={handleChange}
-                placeholder="40380"
-                inputMode="numeric"
-                hint="5-digit station MapID"
-              />
-            </Section>
-
-            <Section title="Weather">
-              <Field
-                label="Zip code"
-                name="zipCode"
-                value={form.zipCode}
-                onChange={handleChange}
-                placeholder="60601"
-                inputMode="numeric"
-                maxLength={5}
-                hint="No API key needed — powered by Open-Meteo"
-              />
-            </Section>
-
-            <Section title="Appearance">
-              <div className="grid grid-cols-2 gap-2">
-                {themes.map((theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    onClick={() => set({ theme: theme.id })}
-                    className="btn"
-                    style={
-                      form.theme === theme.id
-                        ? {
-                            backgroundColor: 'var(--accent)',
-                            color: 'var(--accent-fg)',
-                            borderColor: 'transparent',
-                          }
-                        : undefined
-                    }
-                  >
-                    {theme.name}
-                  </button>
-                ))}
-              </div>
-
-              <Toggle
-                label="Simulate 7-inch panel"
-                hint="Frames the view at 1024x600 for desktop testing"
-                checked={Boolean(form.isPiMode)}
-                onChange={(v) => set({ isPiMode: v })}
-              />
-            </Section>
-          </div>
-
-          <div className="space-y-4">
-            {import.meta.env.VITE_HOME_INTERFACE_KIOSK === '1' && <NetworkSection />}
-
-            <HomeAssistantSection
-              url={form.haUrl || ''}
-              token={form.haToken || ''}
-              onChange={handleChange}
-            />
-
-            <Section title="Display">
-              <div>
-                <span className="label">Sleep after inactivity</span>
-                <div className="grid grid-cols-4 gap-2">
-                  {[0, 3, 10, 30].map((mins) => (
-                    <button
-                      key={mins}
-                      type="button"
-                      onClick={() => set({ idleSleepMinutes: mins })}
-                      className="btn"
-                      style={
-                        Number(form.idleSleepMinutes) === mins
-                          ? {
-                              backgroundColor: 'var(--accent)',
-                              color: 'var(--accent-fg)',
-                              borderColor: 'transparent',
-                            }
-                          : undefined
-                      }
-                    >
-                      {mins === 0 ? 'Never' : `${mins}m`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </Section>
-
-            <Section title="Power">
-              <div className="grid grid-cols-2 gap-2">
+      <div className="grid min-h-0 flex-1 grid-cols-[170px_minmax(0,1fr)]">
+        <nav
+          className="border-r border-line p-2"
+          aria-label="Settings sections"
+          role="tablist"
+          aria-orientation="vertical"
+        >
+          <div className="space-y-1">
+            {SETTINGS_SECTIONS.map((section) => {
+              const active = activeSection === section.id;
+              return (
                 <button
+                  key={section.id}
+                  id={`settings-tab-${section.id}`}
                   type="button"
-                  onClick={() => {
-                    sleep();
-                    onClose();
-                  }}
-                  className="btn flex-col gap-1 py-3"
-                >
-                  <MoonIcon className="h-5 w-5" />
-                  <span className="text-xs">Sleep</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setConfirm({
-                      title: 'Shut down the Pi?',
-                      message:
-                        'You will need to physically power-cycle it to turn it back on.',
-                      confirmLabel: 'Shut down',
-                      destructive: true,
-                      action: shutdownHost,
-                    })
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls={`settings-panel-${section.id}`}
+                  onClick={() => setActiveSection(section.id)}
+                  className="min-h-16 w-full rounded-xl px-3 py-2 text-left"
+                  style={
+                    active
+                      ? { backgroundColor: 'var(--surface)', color: 'var(--fg)' }
+                      : { color: 'var(--fg-muted)' }
                   }
-                  className="btn flex-col gap-1 py-3"
-                  style={{ color: 'var(--danger)' }}
                 >
-                  <PowerIcon className="h-5 w-5" />
-                  <span className="text-xs">Shut down</span>
+                  <span className="block text-sm font-semibold">{section.label}</span>
+                  <span className="mt-0.5 block text-xs text-fg-faint">{section.detail}</span>
                 </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div
+          id={`settings-panel-${activeSection}`}
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${activeSection}`}
+          className="scroll-y min-h-0 p-3"
+        >
+          <div className="mx-auto max-w-[960px]">
+            {activeSection === 'dashboard' && (
+              <div className="grid grid-cols-[1.1fr_0.9fr] gap-3">
+                <Section title="Transit">
+                  <SecretField
+                    label="CTA API key"
+                    name="ctaApiKey"
+                    value={form.ctaApiKey}
+                    onChange={handleChange}
+                    placeholder="Train Tracker API key…"
+                    hint="Request one at transitchicago.com/developers"
+                  />
+                  <Field
+                    label="Station ID"
+                    name="ctaStationId"
+                    value={form.ctaStationId}
+                    onChange={handleChange}
+                    placeholder="40380"
+                    inputMode="numeric"
+                    hint="5-digit station MapID"
+                  />
+                </Section>
+
+                <Section title="Weather">
+                  <Field
+                    label="Zip code"
+                    name="zipCode"
+                    value={form.zipCode}
+                    onChange={handleChange}
+                    placeholder="60601"
+                    inputMode="numeric"
+                    maxLength={5}
+                    hint="No API key needed — powered by Open-Meteo"
+                  />
+                </Section>
               </div>
-            </Section>
+            )}
+
+            {activeSection === 'connections' && (
+              <div className="space-y-3">
+                {import.meta.env.VITE_HOME_INTERFACE_KIOSK === '1' && <NetworkSection />}
+                <HomeAssistantSection
+                  url={form.haUrl || ''}
+                  token={form.haToken || ''}
+                  onChange={handleChange}
+                />
+              </div>
+            )}
+
+            {activeSection === 'display' && (
+              <div className="grid grid-cols-2 gap-3">
+                <Section title="Appearance">
+                  <div className="grid grid-cols-2 gap-2">
+                    {themes.map((theme) => (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => set({ theme: theme.id })}
+                        className="btn"
+                        style={
+                          form.theme === theme.id
+                            ? {
+                                backgroundColor: 'var(--accent)',
+                                color: 'var(--accent-fg)',
+                                borderColor: 'transparent',
+                              }
+                            : undefined
+                        }
+                      >
+                        {theme.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <Toggle
+                    label="Simulate 7-inch panel"
+                    hint="Frames the view at 800x480 for desktop testing"
+                    checked={Boolean(form.isPiMode)}
+                    onChange={(v) => set({ isPiMode: v })}
+                  />
+                </Section>
+
+                <Section title="Sleep">
+                  <div>
+                    <span className="label">Sleep after inactivity</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[0, 3, 10, 30].map((mins) => (
+                        <button
+                          key={mins}
+                          type="button"
+                          onClick={() => set({ idleSleepMinutes: mins })}
+                          className="btn"
+                          style={
+                            Number(form.idleSleepMinutes) === mins
+                              ? {
+                                  backgroundColor: 'var(--accent)',
+                                  color: 'var(--accent-fg)',
+                                  borderColor: 'transparent',
+                                }
+                              : undefined
+                          }
+                        >
+                          {mins === 0 ? 'Never' : `${mins}m`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Section>
+              </div>
+            )}
+
+            {activeSection === 'system' && (
+              <Section title="Power">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sleep();
+                      onClose();
+                    }}
+                    className="btn min-h-24 flex-col gap-2 py-3"
+                  >
+                    <MoonIcon className="h-6 w-6" />
+                    <span>Sleep display</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConfirm({
+                        title: 'Shut down the Pi?',
+                        message:
+                          'You will need to physically power-cycle it to turn it back on.',
+                        confirmLabel: 'Shut down',
+                        destructive: true,
+                        action: shutdownHost,
+                      })
+                    }
+                    className="btn min-h-24 flex-col gap-2 py-3"
+                    style={{ color: 'var(--danger)' }}
+                  >
+                    <PowerIcon className="h-6 w-6" />
+                    <span>Shut down Pi</span>
+                  </button>
+                </div>
+              </Section>
+            )}
           </div>
         </div>
       </div>

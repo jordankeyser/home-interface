@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useHomeAssistant } from '../../../hooks/useHomeAssistant';
 import { useDisplay } from '../../../hooks/useDisplay';
 import { displayName, isOn } from '../../../lib/haEntities';
-import { HomeIcon, PowerIcon, WarningIcon } from '../../icons';
+import { BulbIcon, HomeIcon, PowerIcon, WarningIcon } from '../../icons';
 import DeviceTile from './DeviceTile';
 import BrightnessSheet from './BrightnessSheet';
 
-/** Tiles per row on the 1024px panel. */
-const COLUMNS = 4;
+/** Tiles per row in the device half of the 800px panel. */
+const COLUMNS = 2;
 
 const Message = ({ icon, title, detail, action }) => (
   <div className="card flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center">
@@ -30,10 +30,12 @@ const DevicesModule = ({ onSettingsClick }) => {
     actionError,
     toggle,
     setBrightness,
+    turnOn,
     turnOff,
   } = useHomeAssistant();
   const { isAsleep } = useDisplay();
   const [adjustingId, setAdjustingId] = useState(null);
+  const closeBrightness = useCallback(() => setAdjustingId(null), []);
 
   // The panel wakes to the first page, so a brightness sheet left open when
   // it slept shouldn't be sitting over the trains. Adjusting state during
@@ -97,12 +99,13 @@ const DevicesModule = ({ onSettingsClick }) => {
 
   const all = groups.flatMap((g) => g.entities);
   const onCount = all.filter(isOn).length;
+  const offCount = all.filter((entity) => entity.state === 'off').length;
   const adjusting = adjustingId && all.find((e) => e.entity_id === adjustingId);
   const adjustingGroup = adjusting && groups.find((g) => g.entities.includes(adjusting));
 
   return (
     <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
-      <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
+      <div className="mb-3 flex min-h-12 shrink-0 items-center justify-between gap-3">
         <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
           <HomeIcon className="h-6 w-6 shrink-0 text-accent" />
           <span className="truncate">Home</span>
@@ -111,80 +114,113 @@ const DevicesModule = ({ onSettingsClick }) => {
           )}
         </h2>
 
-        <div className="flex shrink-0 items-center gap-2">
-          {stale && (
-            <span className="text-warning" title="Can’t reach Home Assistant — showing last known state">
-              <WarningIcon className="h-5 w-5" />
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => turnOff(all)}
-            disabled={stale || onCount === 0}
-            className="btn disabled:opacity-40"
+        {stale && (
+          <span
+            className="flex shrink-0 items-center gap-2 text-sm font-medium text-warning"
+            title="Can’t reach Home Assistant — showing last known state"
           >
-            <PowerIcon className="h-5 w-5" />
-            All off
-          </button>
-        </div>
+            <WarningIcon className="h-5 w-5" />
+            Offline
+          </span>
+        )}
       </div>
 
       {actionError && (
-        <div className="mb-2 shrink-0 text-sm font-medium text-danger" role="status">
+        <div className="mb-2 shrink-0 text-sm font-medium text-danger" role="status" aria-live="polite">
           {actionError}
         </div>
       )}
 
-      {all.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-          <div className="text-base font-semibold text-fg">No devices yet</div>
-          <div className="text-sm text-fg-muted">
-            Lights, switches and fans you add in Home Assistant will appear here.
-          </div>
+      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+        <div className="card-inset min-h-0 overflow-hidden p-3">
+          {all.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+              <div className="text-base font-semibold text-fg">No devices yet</div>
+              <div className="text-sm text-fg-muted">
+                Lights, switches and fans will appear here.
+              </div>
+            </div>
+          ) : (
+            <div className="scroll-y h-full pr-1 pb-3">
+              <div
+                className="grid gap-x-3 gap-y-4"
+                style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
+              >
+                {groups.map((group) => {
+                  const span = Math.min(group.entities.length, COLUMNS);
+                  return (
+                    <section key={group.id ?? 'other'} style={{ gridColumn: `span ${span}` }}>
+                      {group.name && (
+                        <h3 className="eyebrow mb-2 truncate px-1">{group.name}</h3>
+                      )}
+                      <div
+                        className="grid gap-3"
+                        style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
+                      >
+                        {group.entities.map((entity) => (
+                          <DeviceTile
+                            key={entity.entity_id}
+                            entity={entity}
+                            name={displayName(entity, group.name)}
+                            disabled={stale}
+                            onToggle={toggle}
+                            onAdjust={(e) => setAdjustingId(e.entity_id)}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="scroll-y min-h-0 flex-1 pr-1 pb-4">
-          {/* Rooms share rows: a one-lamp bedroom sits beside a one-lamp
-              kitchen instead of each taking a full row, so a small home fits
-              without scrolling. Each room spans as many columns as it has
-              devices, up to a full row. */}
-          <div
-            className="grid gap-x-3 gap-y-4"
-            style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
+
+        <div className="grid min-h-0 grid-rows-2 gap-3">
+          <button
+            type="button"
+            onClick={() => turnOn(all)}
+            disabled={stale || offCount === 0}
+            className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-line bg-surface-inset p-5 text-center active:bg-surface-hover disabled:opacity-40"
+            style={{
+              backgroundColor:
+                offCount > 0 && !stale
+                  ? 'color-mix(in srgb, var(--lamp) 11%, var(--surface-inset))'
+                  : undefined,
+            }}
           >
-            {groups.map((group) => {
-              const span = Math.min(group.entities.length, COLUMNS);
-              return (
-                <section key={group.id ?? 'other'} style={{ gridColumn: `span ${span}` }}>
-                  {group.name && <h3 className="eyebrow mb-2 truncate px-1">{group.name}</h3>}
-                  <div
-                    className="grid gap-3"
-                    style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
-                  >
-                    {group.entities.map((entity) => (
-                      <DeviceTile
-                        key={entity.entity_id}
-                        entity={entity}
-                        name={displayName(entity, group.name)}
-                        disabled={stale}
-                        onToggle={toggle}
-                        onAdjust={(e) => setAdjustingId(e.entity_id)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-lamp text-[#211700]">
+              <BulbIcon className="h-7 w-7" />
+            </span>
+            <span>
+              <span className="block text-xl font-semibold text-fg">All on</span>
+              <span className="mt-1 block text-sm text-fg-muted">Turn every device on</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => turnOff(all)}
+            disabled={stale || onCount === 0}
+            className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-line bg-surface-inset p-5 text-center active:bg-surface-hover disabled:opacity-40"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface text-fg-muted">
+              <PowerIcon className="h-7 w-7" />
+            </span>
+            <span>
+              <span className="block text-xl font-semibold text-fg">All off</span>
+              <span className="mt-1 block text-sm text-fg-muted">Turn every device off</span>
+            </span>
+          </button>
         </div>
-      )}
+      </div>
 
       {adjusting && (
         <BrightnessSheet
           entity={adjusting}
           name={displayName(adjusting, adjustingGroup?.name)}
           onChange={(pct) => setBrightness(adjusting, pct)}
-          onClose={() => setAdjustingId(null)}
+          onClose={closeBrightness}
         />
       )}
     </div>

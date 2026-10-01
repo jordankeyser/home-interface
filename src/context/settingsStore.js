@@ -17,7 +17,7 @@ export const DEFAULT_SETTINGS = {
   haToken: '',
   /** Minutes of inactivity before the panel sleeps. 0 disables sleep. */
   idleSleepMinutes: 3,
-  /** Preview the 1024x600 panel while developing on a desktop browser. */
+  /** Preview the actual 800x480 panel while developing on a desktop browser. */
   isPiMode: false,
   theme: 'dark',
 };

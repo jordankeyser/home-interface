@@ -2,53 +2,25 @@ import { useState } from 'react';
 import SettingsModal from './SettingsModal';
 import { useSettings } from '../hooks/useSettings';
 
-/**
- * Ambient background: three slow-drifting colour fields over the canvas.
- * The classes these used to rely on (`animate-blob`, `animation-delay-2000`)
- * were never defined anywhere, so the background was completely static.
- */
-const Ambience = () => (
-  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-    <div
-      className="absolute -top-1/4 -left-1/5 h-[70%] w-[70%] animate-drift-a rounded-full blur-[120px]"
-      style={{
-        background:
-          'radial-gradient(circle, rgb(var(--glow-a) / var(--glow-strength)) 0%, transparent 70%)',
-      }}
-    />
-    <div
-      className="absolute -top-1/5 -right-1/4 h-[65%] w-[65%] animate-drift-b rounded-full blur-[120px]"
-      style={{
-        background:
-          'radial-gradient(circle, rgb(var(--glow-b) / var(--glow-strength)) 0%, transparent 70%)',
-      }}
-    />
-    <div
-      className="absolute -bottom-1/3 left-1/4 h-[70%] w-[70%] animate-drift-c rounded-full blur-[120px]"
-      style={{
-        background:
-          'radial-gradient(circle, rgb(var(--glow-c) / var(--glow-strength)) 0%, transparent 70%)',
-      }}
-    />
-  </div>
-);
-
 const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
   const [localOpen, setLocalOpen] = useState(false);
   const { settings } = useSettings();
 
-  const isPiMode = settings.isPiMode;
+  // Preview framing is desktop-only. A saved preview setting must never add a
+  // second frame around the real kiosk viewport.
+  const isPiMode =
+    settings.isPiMode && import.meta.env.VITE_HOME_INTERFACE_KIOSK !== '1';
   const settingsOpen = isSettingsOpen ?? localOpen;
   const setSettingsOpen = setIsSettingsOpen || setLocalOpen;
 
   return (
     <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-canvas text-fg">
-      {/* In Pi mode, frame a 1024x600 viewport so the real panel can be
+      {/* In Pi mode, frame the actual 800x480 viewport so the real panel can be
           previewed from a desktop browser. */}
       <div
         className={
           isPiMode
-            ? 'relative h-[600px] w-[1024px] overflow-hidden rounded-2xl border-8 border-neutral-800 bg-canvas shadow-2xl'
+            ? 'relative h-[480px] w-[800px] overflow-hidden rounded-2xl border-8 border-neutral-800 bg-canvas shadow-2xl'
             : 'relative h-full w-full overflow-hidden'
         }
       >
@@ -59,8 +31,6 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
               'radial-gradient(120% 90% at 50% 0%, var(--canvas-2) 0%, var(--canvas) 62%)',
           }}
         />
-        <Ambience />
-
         {/* animate-shift creeps the whole panel ~2px over 15 minutes so an
             always-on wall display never holds one pixel value all day.
             Pages bring their own padding so swiping moves them edge to edge. */}

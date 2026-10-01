@@ -117,32 +117,34 @@ const TrainModule = () => {
 
   return (
     <div className="card flex h-full w-full min-w-0 flex-col overflow-hidden p-4">
-      <div className="mb-1.5 flex shrink-0 items-center justify-between gap-3">
-        <h2 className="flex min-w-0 items-center gap-2.5 text-xl font-semibold text-fg">
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
           <TrainIcon className="h-6 w-6 shrink-0 text-accent" />
-          <span className="truncate">{stationName || 'Arrivals'}</span>
-        </h2>
-
-        <div className="flex shrink-0 items-center gap-0.5">
-          {stale ? (
-            <span className="text-warning" title="Showing last known arrivals">
-              <WarningIcon className="h-4 w-4" />
-            </span>
-          ) : (
-            lastUpdated && (
-              <span className="nums mr-1 hidden text-xs text-fg-faint md:block">
-                {lastUpdated.toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-semibold text-fg">
+              {stationName || 'Arrivals'}
+            </h2>
+            <div className="nums flex items-center gap-1 text-xs text-fg-faint">
+              {stale && <WarningIcon className="h-3.5 w-3.5 text-warning" />}
+              <span>
+                {stale
+                  ? 'Showing last update'
+                  : lastUpdated
+                    ? `Updated ${lastUpdated.toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}`
+                    : 'Live arrivals'}
               </span>
-            )
-          )}
+            </div>
+          </div>
+        </div>
 
+        <div className="control-group shrink-0">
           <button
             type="button"
             onClick={togglePause}
-            className="icon-btn"
+            className="control-btn"
             data-state={isPaused ? 'on' : 'off'}
             aria-label={isPaused ? 'Resume updates' : 'Pause updates'}
           >
@@ -153,7 +155,7 @@ const TrainModule = () => {
             type="button"
             onClick={refresh}
             disabled={loading || isPaused}
-            className="icon-btn"
+            className="control-btn"
             aria-label="Refresh arrivals"
           >
             <RefreshIcon className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />

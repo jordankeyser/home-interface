@@ -186,6 +186,24 @@ export const useHomeAssistant = () => {
     [run]
   );
 
+  /** Everything available in the list that's off, on — one mixed-domain call. */
+  const turnOn = useCallback(
+    (entities) => {
+      const ids = entities
+        .filter((entity) => entity.state === 'off')
+        .map((entity) => entity.entity_id);
+      if (ids.length === 0) return undefined;
+      return run(
+        'homeassistant',
+        'turn_on',
+        { entity_id: ids },
+        ids.map((id) => [id, { state: 'on' }]),
+        'Couldn’t turn everything on'
+      );
+    },
+    [run]
+  );
+
   const current = data.key === connKey ? data : blank(connKey);
   const { states, layout } = current;
 
@@ -232,6 +250,7 @@ export const useHomeAssistant = () => {
     actionError,
     toggle,
     setBrightness,
+    turnOn,
     turnOff,
   };
 };

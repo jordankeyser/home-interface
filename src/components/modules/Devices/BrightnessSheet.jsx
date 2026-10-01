@@ -55,11 +55,21 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
     isOn(entity) ? (brightnessPct(entity) ?? 100) : 0
   );
   const trackRef = useRef(null);
+  const doneRef = useRef(null);
   const draggingRef = useRef(false);
   const [throttle] = useState(() => createThrottle(SEND_EVERY_MS));
 
   // Closing mid-throttle still delivers the last value.
   useEffect(() => () => throttle.flush(), [throttle]);
+
+  useEffect(() => {
+    const onWindowKeyDown = (event) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onWindowKeyDown);
+    doneRef.current?.focus();
+    return () => window.removeEventListener('keydown', onWindowKeyDown);
+  }, [onClose]);
 
   const pctAt = (clientX) => {
     const r = trackRef.current.getBoundingClientRect();
@@ -97,7 +107,7 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/75 p-3 sm:items-center"
       // On click, not pointerdown: closing on pointerdown lets the rest of the
       // tap land on whatever tile is underneath and toggle it.
       onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -105,7 +115,7 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
       aria-modal="true"
       aria-label={`${name} brightness`}
     >
-      <div className="card w-full max-w-[640px] p-6">
+      <div className="card w-full max-w-[620px] p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="truncate text-lg font-semibold text-fg">{name}</h3>
@@ -113,7 +123,12 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
               {value === 0 ? 'Off' : `${value}%`}
             </div>
           </div>
-          <button type="button" onClick={onClose} className="btn btn-primary shrink-0">
+          <button
+            ref={doneRef}
+            type="button"
+            onClick={onClose}
+            className="btn btn-primary shrink-0"
+          >
             Done
           </button>
         </div>
@@ -132,14 +147,23 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
           onPointerUp={onPointerEnd}
           onPointerCancel={onPointerEnd}
           onKeyDown={onKeyDown}
-          className="card-inset relative mt-6 h-20 cursor-pointer overflow-hidden outline-none focus-visible:border-accent"
+          className="brightness-slider card-inset relative mt-5 flex h-20 cursor-pointer items-center px-4"
           // The finger drags the slider, never the page behind it.
           style={{ touchAction: 'none' }}
         >
-          <div
-            className="absolute inset-y-0 left-0 bg-lamp"
-            style={{ width: `${value}%`, opacity: 0.35 + (value / 100) * 0.55 }}
-          />
+          <div className="relative h-3 w-full rounded-full bg-line-strong">
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-lamp"
+              style={{ width: `${value}%` }}
+            />
+            <span
+              className="absolute top-1/2 h-7 w-7 rounded-full border-2 border-white bg-lamp shadow-md"
+              style={{
+                left: `${value}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+            />
+          </div>
         </div>
 
         <div className="mt-4 grid grid-cols-5 gap-2">
@@ -158,6 +182,7 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
               onClick={() => set(pct, true)}
               className="btn nums"
               aria-pressed={value === pct}
+              style={value === pct ? { borderColor: 'var(--accent)' } : undefined}
             >
               {pct}%
             </button>
