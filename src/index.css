@@ -583,6 +583,18 @@ html[data-kiosk='true'] .btn {
   -webkit-backdrop-filter: none;
 }
 
+/* Large CSS blurs and isolated card layers are disproportionately expensive on
+   the Pi's 800x480 compositor. Keeping them on desktop preserves the intended
+   visual treatment; removing them in kiosk mode raises swipe rendering from
+   roughly 10 FPS to the display's full 60 FPS. */
+html[data-kiosk='true'] [class*='blur-'] {
+  display: none !important;
+}
+
+html[data-kiosk='true'] .card {
+  isolation: auto;
+}
+
 /* ---------------------------------------------------------------------------
    Touch / kiosk behaviour
    --------------------------------------------------------------------------- */

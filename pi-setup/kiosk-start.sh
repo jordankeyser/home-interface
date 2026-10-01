@@ -73,6 +73,11 @@ cd "$APP_DIR" || {
 
 if [[ -n "${CHROMIUM_BIN:-}" ]]; then
     CHROMIUM="$CHROMIUM_BIN"
+elif [[ -x /usr/lib/chromium/chromium ]]; then
+    # Raspberry Pi OS wraps this binary with compatibility flags intended for
+    # general desktop browsing. The kiosk needs neither accessibility scanning
+    # nor extension startup, and the package binary is measurably lighter.
+    CHROMIUM="/usr/lib/chromium/chromium"
 elif command -v chromium-browser >/dev/null 2>&1; then
     CHROMIUM="chromium-browser"
 elif command -v chromium >/dev/null 2>&1; then
@@ -180,11 +185,18 @@ launch_chromium() {
     # the basic store prevents that prompt from covering the dashboard.
     exec "$CHROMIUM" \
         --kiosk \
+        --ozone-platform=wayland \
+        --user-data-dir="$STATE_DIR/chromium-profile" \
         --noerrdialogs \
         --disable-infobars \
         --no-first-run \
         --no-default-browser-check \
         --password-store=basic \
+        --disable-background-networking \
+        --disable-component-update \
+        --disable-default-apps \
+        --disable-extensions \
+        --disable-sync \
         --disable-session-crashed-bubble \
         --disable-application-cache \
         --overscroll-history-navigation=0 \
