@@ -565,6 +565,24 @@ body {
   }
 }
 
+/* Raspberry Pi kiosk performance mode. The combination of continuously moving
+   blurred layers and backdrop-filter surfaces kept Chromium's GPU process near
+   a full CPU core even while the dashboard was idle. The Pi launcher sets the
+   data attribute before first paint; regular desktop previews keep all effects. */
+html[data-kiosk='true'] *,
+html[data-kiosk='true'] *::before,
+html[data-kiosk='true'] *::after {
+  animation: none !important;
+  transition-duration: 0.01ms !important;
+}
+
+html[data-kiosk='true'] .card,
+html[data-kiosk='true'] .icon-btn,
+html[data-kiosk='true'] .btn {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* ---------------------------------------------------------------------------
    Touch / kiosk behaviour
    --------------------------------------------------------------------------- */

@@ -136,7 +136,7 @@ start_vite() {
     # moving Vite to 5174 while Chromium continues to open 5173.
     : >"$VITE_LOG"
     log "starting Vite on 127.0.0.1:$UI_PORT"
-    HOME_INTERFACE_KIOSK=1 "$NPM_BIN" run dev -- \
+    HOME_INTERFACE_KIOSK=1 VITE_HOME_INTERFACE_KIOSK=1 "$NPM_BIN" run dev -- \
         --host 127.0.0.1 --port "$UI_PORT" --strictPort \
         >>"$VITE_LOG" 2>&1 &
     vite_pid=$!
@@ -173,14 +173,13 @@ launch_chromium() {
     # This function runs in the background. `exec` makes chromium_pid the real
     # browser PID instead of a wrapper subshell, so supervision and cleanup do
     # not orphan a browser after a restart.
-    # Chromium 151's native Wayland GPU path paints an entirely white frame on
-    # this Pi's DSI display. Software rendering preserves native Wayland touch
-    # input and was verified from the live framebuffer before being enabled.
+    # Chromium 154 fixes the native Wayland rendering and networking failures
+    # seen in Chromium 151. Keep hardware acceleration enabled: forcing software
+    # compositing makes swipes and touch feedback visibly lag on this panel.
     # A wall panel also cannot unlock a desktop keyring after unattended boot;
     # the basic store prevents that prompt from covering the dashboard.
     exec "$CHROMIUM" \
         --kiosk \
-        --disable-gpu \
         --noerrdialogs \
         --disable-infobars \
         --no-first-run \
