@@ -67,8 +67,13 @@ Settings are entered from the gear icon and stored in Chromium's local storage.
 | Zip code | Used by Open-Meteo; no weather API key required |
 | Home Assistant address | Defaults to `http://127.0.0.1:8123` |
 | Home Assistant token | Long-lived access token |
+| Wi-Fi | Scan and connect through NetworkManager on the Pi only |
 | Theme | Dark or light |
 | Idle sleep | Never, 3, 10, or 30 minutes |
+
+The kiosk-only Network panel talks to a loopback Vite endpoint. Wi-Fi passwords
+are passed directly to NetworkManager over stdin; the dashboard does not put
+them in local storage, command arguments, application logs, or the repository.
 
 ## Home Assistant page
 

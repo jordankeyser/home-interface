@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSettings } from '../hooks/useSettings';
 import { useDisplay } from '../hooks/useDisplay';
 import { themes } from '../config/themes';
 import { shutdownHost } from '../lib/displayApi';
 import { testHomeAssistant } from '../lib/homeAssistantClient';
 import { isSupported } from '../lib/haEntities';
+import { connectWifi, getWifiStatus, scanWifiNetworks } from '../lib/wifiClient';
 import ConfirmDialog from './ConfirmDialog';
 import {
   CloseIcon,
@@ -100,6 +101,163 @@ const Section = ({ title, children }) => (
     <div className="space-y-3">{children}</div>
   </section>
 );
+
+const NetworkSection = () => {
+  const [status, setStatus] = useState({ state: 'loading' });
+  const [networks, setNetworks] = useState([]);
+  const [ssid, setSsid] = useState('');
+  const [password, setPassword] = useState('');
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState('');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getWifiStatus()
+      .then((next) => {
+        if (!active) return;
+        setStatus({ state: 'ready', ...next });
+        if (next.ssid) setSsid(next.ssid);
+      })
+      .catch((error) => {
+        if (active) setStatus({ state: 'error', error: error.message });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const scan = async () => {
+    setBusy('scan');
+    setMessage('');
+    try {
+      const result = await scanWifiNetworks();
+      setNetworks(result.networks || []);
+      if (!result.networks?.length) setMessage('No nearby networks found');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const connect = async () => {
+    setBusy('connect');
+    setMessage('');
+    try {
+      const next = await connectWifi({ ssid: ssid.trim(), password, hidden });
+      setStatus({ state: 'ready', ...next });
+      setPassword('');
+      setMessage(next.connected ? `Connected to ${next.ssid}` : 'Connection saved');
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const statusText =
+    status.state === 'loading'
+      ? 'Checking Wi-Fi…'
+      : status.connected
+        ? `Connected to ${status.ssid}`
+        : status.available
+          ? 'Wi-Fi is not connected'
+          : status.error || 'No Wi-Fi adapter found';
+
+  return (
+    <Section title="Network">
+      <div className="flex min-h-[44px] items-center justify-between gap-3">
+        <span
+          className={`text-sm font-medium ${status.connected ? 'text-positive' : 'text-fg-muted'}`}
+          role="status"
+        >
+          {statusText}
+        </span>
+        <button type="button" onClick={scan} disabled={Boolean(busy)} className="btn shrink-0">
+          {busy === 'scan' ? 'Scanning…' : 'Scan'}
+        </button>
+      </div>
+
+      {networks.length > 0 && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {networks.slice(0, 6).map((network) => (
+            <button
+              key={network.ssid}
+              type="button"
+              onClick={() => {
+                setSsid(network.ssid);
+                setHidden(false);
+                setMessage('');
+              }}
+              className="card-inset flex min-h-[48px] items-center justify-between gap-3 px-3 py-2 text-left"
+              style={
+                ssid === network.ssid
+                  ? { borderColor: 'var(--accent)', color: 'var(--fg)' }
+                  : undefined
+              }
+            >
+              <span className="min-w-0 truncate text-sm font-medium">{network.ssid}</span>
+              <span className="shrink-0 text-xs text-fg-faint">
+                {network.secure ? 'Secured' : 'Open'} · {network.signal}%
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Field
+        label="Network name"
+        name="wifiSsid"
+        value={ssid}
+        onChange={(event) => {
+          setSsid(event.target.value);
+          setMessage('');
+        }}
+        placeholder="Wi-Fi name"
+        autoCapitalize="none"
+        enterKeyHint="next"
+      />
+      <SecretField
+        label="Wi-Fi password"
+        name="wifiPassword"
+        value={password}
+        onChange={(event) => {
+          setPassword(event.target.value);
+          setMessage('');
+        }}
+        placeholder="Password"
+        hint="Sent only to NetworkManager on this Pi; never saved by the dashboard"
+      />
+      <Toggle
+        label="Hidden network"
+        hint="Enable only if the network does not broadcast its name"
+        checked={hidden}
+        onChange={setHidden}
+      />
+      <div className="flex min-h-[48px] items-center gap-3">
+        <button
+          type="button"
+          onClick={connect}
+          disabled={!ssid.trim() || Boolean(busy)}
+          className="btn btn-primary shrink-0 disabled:opacity-40"
+        >
+          {busy === 'connect' ? 'Connecting…' : 'Connect'}
+        </button>
+        {message && (
+          <span
+            className={`min-w-0 text-sm font-medium ${
+              status.connected && message.startsWith('Connected') ? 'text-positive' : 'text-fg-muted'
+            }`}
+            role="status"
+          >
+            {message}
+          </span>
+        )}
+      </div>
+    </Section>
+  );
+};
 
 /**
  * Checks the address and token as typed — before saving — so a wrong token is
@@ -276,6 +434,8 @@ const SettingsModal = ({ onClose }) => {
           </div>
 
           <div className="space-y-4">
+            {import.meta.env.VITE_HOME_INTERFACE_KIOSK === '1' && <NetworkSection />}
+
             <HomeAssistantSection
               url={form.haUrl || ''}
               token={form.haToken || ''}

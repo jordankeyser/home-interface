@@ -71,6 +71,18 @@ Internet access is not a boot dependency. Weather and CTA may show their normal
 error states while offline, but the local interface and Home Assistant page
 still load.
 
+## Wi-Fi recovery from the touchscreen
+
+Open the dashboard's gear menu and scroll to **Network**. The panel can scan for
+nearby access points or accept a network name manually, including hidden
+networks. Selecting **Connect** updates NetworkManager and enables automatic
+reconnection at boot. The endpoint exists only in kiosk mode and accepts only
+loopback requests from the panel itself.
+
+The password is sent to `nmcli --ask` over stdin. It is not stored by the React
+app, printed in process arguments, or written to the kiosk logs. NetworkManager
+owns the resulting system connection profile.
+
 ## Diagnostics
 
 Run:
