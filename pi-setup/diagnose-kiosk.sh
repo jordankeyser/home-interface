@@ -21,6 +21,7 @@ printf 'type=%s wayland=%s display=%s\n' \
 
 section "launch configuration"
 systemctl is-enabled home-interface-kiosk.service 2>&1 || true
+systemctl is-enabled home-interface-server.service 2>&1 || true
 grep -n 'kiosk-start.sh' \
     "$HOME/.config/labwc/autostart" \
     "$HOME/.xinitrc" \

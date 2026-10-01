@@ -36,10 +36,16 @@ backup_if_present "$LABWC_AUTOSTART"
 backup_if_present "$HOME/.xinitrc"
 backup_if_present "$HOME/.bash_profile"
 
-echo "Removing duplicate system kiosk unit"
+echo "Removing obsolete system units"
 if command -v systemctl >/dev/null 2>&1; then
-    sudo systemctl disable --now home-interface-kiosk.service 2>/dev/null || true
-    sudo rm -f /etc/systemd/system/home-interface-kiosk.service
+    # home-interface-server.service belonged to an older combined Node server.
+    # Its entry point no longer exists, so leaving the unit installed creates a
+    # permanent five-second crash loop. Display control now has its own optional
+    # home-interface-display.service and the UI is served by the launcher below.
+    for unit in home-interface-kiosk.service home-interface-server.service; do
+        sudo systemctl disable --now "$unit" 2>/dev/null || true
+        sudo rm -f "/etc/systemd/system/$unit"
+    done
     sudo systemctl daemon-reload
     sudo systemctl set-default graphical.target >/dev/null
 fi
