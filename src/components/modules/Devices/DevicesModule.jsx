@@ -181,13 +181,8 @@ const DevicesModule = ({ onSettingsClick }) => {
             type="button"
             onClick={() => turnOn(all)}
             disabled={stale || offCount === 0}
-            className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-line bg-surface-inset p-5 text-center active:bg-surface-hover disabled:opacity-40"
-            style={{
-              backgroundColor:
-                offCount > 0 && !stale
-                  ? 'color-mix(in srgb, var(--lamp) 11%, var(--surface-inset))'
-                  : undefined,
-            }}
+            className="glass-action"
+            data-tone="warm"
           >
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-lamp text-[#211700]">
               <BulbIcon className="h-7 w-7" />
@@ -202,7 +197,7 @@ const DevicesModule = ({ onSettingsClick }) => {
             type="button"
             onClick={() => turnOff(all)}
             disabled={stale || onCount === 0}
-            className="flex min-h-0 flex-col items-center justify-center gap-3 rounded-[1.25rem] border border-line bg-surface-inset p-5 text-center active:bg-surface-hover disabled:opacity-40"
+            className="glass-action"
           >
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-surface text-fg-muted">
               <PowerIcon className="h-7 w-7" />

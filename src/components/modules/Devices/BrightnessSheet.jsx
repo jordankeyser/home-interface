@@ -46,9 +46,8 @@ const createThrottle = (ms) => {
  * initialises from the light each time; while it's open, the finger wins over
  * any state updates arriving from Home Assistant.
  *
- * Portalled to <body>: the cards' backdrop-filter and the panel's burn-in
- * transform both trap `position: fixed` inside them, so rendered in place
- * this would be clipped to the devices card.
+ * Portalled to <body>: the panel's burn-in transform traps `position: fixed`
+ * inside it, so rendered in place this would be clipped to the devices card.
  */
 const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
   const [value, setValue] = useState(() =>

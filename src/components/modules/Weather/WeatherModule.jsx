@@ -11,15 +11,15 @@ import WeatherGlyph from './WeatherGlyph';
 import { weatherLabel } from '../../../lib/weatherCodes';
 
 const Stat = ({ icon: Icon, label, value, unit }) => (
-  <div className="flex min-w-0 items-center justify-center gap-1.5">
-    <Icon className="h-4 w-4 shrink-0 text-fg-faint" />
-    <div className="min-w-0 leading-tight">
+  <div className="metric-chip flex min-w-0 flex-col items-center justify-center gap-0.5 text-center">
+    <div className="flex min-w-0 items-center justify-center gap-1 leading-tight">
+      <Icon className="h-4 w-4 shrink-0 text-fg-faint" />
       <div className="nums whitespace-nowrap text-sm font-semibold text-fg">
         {value}
         {unit && <span className="ml-0.5 text-xs font-normal text-fg-muted">{unit}</span>}
       </div>
-      <div className="truncate text-xs font-medium text-fg-faint">{label}</div>
     </div>
+    <div className="text-xs font-medium text-fg-faint">{label}</div>
   </div>
 );
 
@@ -109,7 +109,7 @@ const WeatherModule = () => {
         <WeatherGlyph
           code={current.weather_code}
           isDay={isDay}
-          className="h-12 w-12 shrink-0 text-fg-muted"
+          className="h-12 w-12 shrink-0 text-accent"
         />
         <div className="nums shrink-0 text-5xl leading-none font-semibold tracking-tighter text-fg">
           {Math.round(current.temperature_2m)}°
@@ -133,7 +133,7 @@ const WeatherModule = () => {
             <div
               key={hour.time}
               className={`flex min-w-0 flex-col items-center gap-1 rounded-xl py-1 ${
-                index === 0 ? 'bg-surface-hover' : ''
+                index === 0 ? 'hour-now' : ''
               }`}
             >
               <span className="truncate text-xs font-medium text-fg-faint">
@@ -148,7 +148,7 @@ const WeatherModule = () => {
       </div>
 
       <div className="divider shrink-0" />
-      <div className="grid shrink-0 grid-cols-3 py-2">
+      <div className="grid shrink-0 grid-cols-3 gap-1.5 py-2">
           <Stat
             icon={WindIcon}
             label="Wind"

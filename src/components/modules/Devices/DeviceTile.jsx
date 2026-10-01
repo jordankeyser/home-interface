@@ -16,8 +16,11 @@ const ICONS = {
 };
 
 const LIT_TILE = {
-  backgroundColor: 'color-mix(in srgb, var(--lamp) 14%, var(--surface-inset))',
+  background:
+    'linear-gradient(145deg, color-mix(in srgb, var(--lamp) 22%, transparent), color-mix(in srgb, var(--lamp) 6%, var(--surface-inset)) 64%), var(--surface-inset)',
   borderColor: 'color-mix(in srgb, var(--lamp) 40%, transparent)',
+  boxShadow:
+    'inset 0 1px 0 rgb(255 255 255 / 0.16), 0 14px 28px -24px color-mix(in srgb, var(--lamp) 45%, transparent)',
 };
 
 /**
@@ -47,8 +50,16 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200"
           style={
             on
-              ? { backgroundColor: 'var(--lamp)', color: '#1f1500' }
-              : { backgroundColor: 'var(--surface)', color: 'var(--fg-muted)' }
+              ? {
+                  background: 'linear-gradient(145deg, #fff0b8, var(--lamp))',
+                  color: '#1f1500',
+                  boxShadow: 'inset 0 1px 0 rgb(255 255 255 / 0.55)',
+                }
+              : {
+                  background:
+                    'linear-gradient(145deg, rgb(255 255 255 / 0.09), transparent 58%), var(--surface)',
+                  color: 'var(--fg-muted)',
+                }
           }
         >
           <Icon className="h-5 w-5" />

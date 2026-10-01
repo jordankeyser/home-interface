@@ -359,7 +359,7 @@ const SettingsModal = ({ onClose }) => {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-canvas"
+      className="app-backdrop fixed inset-0 z-50 flex flex-col"
       role="dialog"
       aria-modal="true"
       aria-labelledby="settings-title"

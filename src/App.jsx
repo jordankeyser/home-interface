@@ -22,7 +22,7 @@ function App() {
             {/* Page 1: clock over weather, arrivals down the right */}
             <div
               key="home"
-              className="mx-auto grid h-full min-h-0 w-full max-w-[1500px] grid-cols-1 gap-3 md:grid-cols-[40%_60%]"
+              className="mx-auto grid h-full min-h-0 w-full max-w-[1500px] grid-cols-1 gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
             >
               <div className="flex h-full min-h-0 min-w-0 flex-col gap-3">
                 <ClockBar onSettingsClick={openSettings} />

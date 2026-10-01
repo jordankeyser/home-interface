@@ -14,7 +14,7 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
   const setSettingsOpen = setIsSettingsOpen || setLocalOpen;
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-canvas text-fg">
+    <div className="app-backdrop relative flex h-full w-full items-center justify-center overflow-hidden text-fg">
       {/* In Pi mode, frame the actual 800x480 viewport so the real panel can be
           previewed from a desktop browser. */}
       <div
@@ -24,13 +24,7 @@ const Layout = ({ children, isSettingsOpen, setIsSettingsOpen }) => {
             : 'relative h-full w-full overflow-hidden'
         }
       >
-        <div
-          className="absolute inset-0 bg-canvas"
-          style={{
-            backgroundImage:
-              'radial-gradient(120% 90% at 50% 0%, var(--canvas-2) 0%, var(--canvas) 62%)',
-          }}
-        />
+        <div className="app-backdrop absolute inset-0" />
         {/* animate-shift creeps the whole panel ~2px over 15 minutes so an
             always-on wall display never holds one pixel value all day.
             Pages bring their own padding so swiping moves them edge to edge. */}

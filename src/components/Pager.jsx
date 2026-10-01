@@ -62,7 +62,7 @@ const Pager = ({ children }) => {
               className="h-1.5 rounded-full transition-[width,background-color] duration-300"
               style={{
                 width: i === index ? '1.25rem' : '0.375rem',
-                backgroundColor: i === index ? 'var(--fg-muted)' : 'var(--line-strong)',
+                backgroundColor: i === index ? 'var(--accent)' : 'var(--line-strong)',
               }}
             />
           ))}
