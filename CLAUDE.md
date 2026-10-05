@@ -107,7 +107,12 @@ because it would replace the OS the kiosk runs on.
   through Home Assistant's official AiDot integration (Home Assistant 2026.6+),
   which signs in with the AiDot account and then controls the bulbs over the
   local network. Pair new bulbs in the AiDot app first. Rooms are set as Areas
-  in Home Assistant.
+  in Home Assistant. The bed bulbs sit on a reachable routed subnet, so compose
+  mounts `~/homeassistant/overrides/aidot/coordinator.py` over the built-in
+  AiDot coordinator; the tracked source is
+  `pi-setup/homeassistant/aidot-coordinator.py`. It falls back to the private
+  address reported by AiDot Cloud when UDP discovery cannot cross the subnet;
+  review the override before Home Assistant upgrades.
 - **Update:**
   `sudo docker compose -f ~/homeassistant/compose.yml pull && sudo docker compose -f ~/homeassistant/compose.yml up -d`
 - **Logs:** `sudo docker logs -f homeassistant`

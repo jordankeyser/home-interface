@@ -71,6 +71,23 @@ Internet access is not a boot dependency. Weather and CTA may show their normal
 error states while offline, but the local interface and Home Assistant page
 still load.
 
+## AiDot lights on a routed Wi-Fi subnet
+
+Home Assistant's built-in AiDot integration discovers bulbs with a UDP
+broadcast. A bulb on another routed subnet can be directly reachable while
+remaining unavailable in Home Assistant because broadcasts do not cross the
+subnet boundary.
+
+`homeassistant/aidot-coordinator.py` is a narrow override of Home Assistant's
+AiDot coordinator. It keeps broadcast discovery as the first choice, then uses
+the private local address reported by AiDot Cloud when no broadcast address is
+available. Public addresses are rejected. The override is mounted read-only
+over the built-in coordinator from `~/homeassistant/compose.yml`, so it
+survives container recreation without modifying the image.
+
+Before updating Home Assistant, compare the override with the new built-in
+coordinator. Remove the compose mount to return to the unmodified integration.
+
 ## Wi-Fi recovery from the touchscreen
 
 Open the dashboard's gear menu and scroll to **Network**. The panel can scan for
