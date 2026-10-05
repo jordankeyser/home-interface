@@ -26,6 +26,9 @@ const REGISTRY_EVENTS = [
 
 /** Bursts of registry edits (renaming a room, re-pairing a bulb) land as one refetch. */
 const REGISTRY_REFRESH_MS = 750;
+/** Safety net for integrations that add/remove entities without a registry event reaching us. */
+const STATE_RECONCILE_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 const httpToWs = (url) => {
   const u = new URL(url);
@@ -72,15 +75,23 @@ const buildLayout = (areas, devices, display) => {
  *   onLayout: (layout: {areas: {id: string, name: string}[], entities: Map<string, {areaId: string|null, hidden: boolean}>}) => void,
  *   onStatus: (status: 'connecting'|'open'|'closed'|'auth_failed'|'invalid_url') => void,
  * }} handlers
+ * @param {{reconcileMs?: number, registryRefreshMs?: number, requestTimeoutMs?: number}} options
  */
-export function connectHomeAssistant(baseUrl, token, handlers) {
+export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
+  const reconcileMs = options.reconcileMs ?? STATE_RECONCILE_MS;
+  const registryRefreshMs = options.registryRefreshMs ?? REGISTRY_REFRESH_MS;
+  const requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   let ws = null;
   let nextId = 1;
   const pending = new Map();
   let closedByCaller = false;
   let reconnectTimer = null;
   let registryTimer = null;
+  let reconcileTimer = null;
   let reconnectDelay = 1000;
+  let syncPromise = null;
+  let currentStates = new Map();
+  let currentLayout = null;
 
   const send = (msg) =>
     new Promise((resolve, reject) => {
@@ -89,9 +100,57 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
         return;
       }
       const id = nextId++;
-      pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        pending.delete(id);
+        reject(new Error(`Home Assistant did not answer ${msg.type}`));
+        // A request timing out means the socket may be half-open. Closing it
+        // activates the normal reconnect path and fetches a fresh snapshot.
+        ws?.close();
+      }, requestTimeoutMs);
+      pending.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify({ ...msg, id }));
     });
+
+  const statesMatch = (next) => {
+    if (next.size !== currentStates.size) return false;
+    for (const [id, entity] of next) {
+      const previous = currentStates.get(id);
+      if (
+        !previous ||
+        previous.state !== entity.state ||
+        previous.last_updated !== entity.last_updated
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const publishStates = (states) => {
+    const next = new Map(
+      states.filter((state) => handlers.filter(state.entity_id)).map((state) => [state.entity_id, state])
+    );
+    if (statesMatch(next)) return;
+    currentStates = next;
+    handlers.onStates?.(next);
+  };
+
+  const layoutsMatch = (next) => {
+    if (!currentLayout || next.areas.length !== currentLayout.areas.length) return false;
+    if (next.entities.size !== currentLayout.entities.size) return false;
+    for (let index = 0; index < next.areas.length; index += 1) {
+      const area = next.areas[index];
+      const previous = currentLayout.areas[index];
+      if (area.id !== previous.id || area.name !== previous.name) return false;
+    }
+    for (const [id, meta] of next.entities) {
+      const previous = currentLayout.entities.get(id);
+      if (!previous || meta.areaId !== previous.areaId || meta.hidden !== previous.hidden) {
+        return false;
+      }
+    }
+    return true;
+  };
 
   const loadLayout = async () => {
     const [areas, devices, display] = await Promise.all([
@@ -99,14 +158,43 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
       send({ type: 'config/device_registry/list' }),
       send({ type: 'config/entity_registry/list_for_display' }),
     ]);
-    handlers.onLayout?.(buildLayout(areas, devices, display));
+    const next = buildLayout(areas, devices, display);
+    if (layoutsMatch(next)) return;
+    currentLayout = next;
+    handlers.onLayout?.(next);
+  };
+
+  const reconcile = () => {
+    if (syncPromise) return syncPromise;
+    syncPromise = Promise.all([
+      send({ type: 'get_states' }).then(publishStates),
+      // Rooms are a nicety: if the registries can't be read (a non-admin
+      // token, say) the devices still show, just ungrouped.
+      loadLayout().catch((err) => console.warn('[ha] no room layout:', err.message)),
+    ]).finally(() => {
+      syncPromise = null;
+    });
+    return syncPromise;
+  };
+
+  const scheduleReconcile = () => {
+    clearTimeout(reconcileTimer);
+    reconcileTimer = setTimeout(async () => {
+      try {
+        await reconcile();
+      } catch (err) {
+        console.error('[ha] periodic sync failed:', err.message);
+      } finally {
+        if (!closedByCaller && ws?.readyState === WebSocket.OPEN) scheduleReconcile();
+      }
+    }, reconcileMs);
   };
 
   const scheduleLayoutRefresh = () => {
     clearTimeout(registryTimer);
     registryTimer = setTimeout(() => {
-      loadLayout().catch((err) => console.error('[ha] layout refresh failed:', err.message));
-    }, REGISTRY_REFRESH_MS);
+      reconcile().catch((err) => console.error('[ha] registry sync failed:', err.message));
+    }, registryRefreshMs);
   };
 
   const onReady = async () => {
@@ -117,15 +205,8 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
       await Promise.all(
         REGISTRY_EVENTS.map((event_type) => send({ type: 'subscribe_events', event_type }))
       );
-      // Rooms are a nicety: if the registries can't be read (a non-admin
-      // token, say) the devices still show, just ungrouped.
-      const [states] = await Promise.all([
-        send({ type: 'get_states' }),
-        loadLayout().catch((err) => console.warn('[ha] no room layout:', err.message)),
-      ]);
-      handlers.onStates?.(
-        new Map(states.filter((s) => handlers.filter(s.entity_id)).map((s) => [s.entity_id, s]))
-      );
+      await reconcile();
+      scheduleReconcile();
     } catch (err) {
       console.error('[ha] initial load failed:', err.message);
     }
@@ -171,6 +252,7 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
           const p = pending.get(msg.id);
           if (!p) return;
           pending.delete(msg.id);
+          clearTimeout(p.timer);
           if (msg.success) p.resolve(msg.result);
           else p.reject(new Error(msg.error?.message || 'Home Assistant request failed'));
           return;
@@ -180,6 +262,10 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
           const { event_type: type, data } = msg.event || {};
           if (type === 'state_changed') {
             if (data?.entity_id && handlers.filter(data.entity_id)) {
+              const next = new Map(currentStates);
+              if (data.new_state) next.set(data.entity_id, data.new_state);
+              else next.delete(data.entity_id);
+              currentStates = next;
               handlers.onStateChanged?.(data.entity_id, data.new_state);
             }
           } else if (REGISTRY_EVENTS.includes(type)) {
@@ -193,9 +279,14 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
     };
 
     ws.onclose = () => {
-      pending.forEach((p) => p.reject(new Error('Connection closed')));
+      pending.forEach((p) => {
+        clearTimeout(p.timer);
+        p.reject(new Error('Connection closed'));
+      });
       pending.clear();
       clearTimeout(registryTimer);
+      clearTimeout(reconcileTimer);
+      syncPromise = null;
       if (closedByCaller || authFailed) return;
       handlers.onStatus?.('closed');
       reconnectTimer = setTimeout(open, reconnectDelay);
@@ -219,6 +310,8 @@ export function connectHomeAssistant(baseUrl, token, handlers) {
       closedByCaller = true;
       clearTimeout(reconnectTimer);
       clearTimeout(registryTimer);
+      clearTimeout(reconcileTimer);
+      pending.forEach((p) => clearTimeout(p.timer));
       ws?.close();
     },
   };
