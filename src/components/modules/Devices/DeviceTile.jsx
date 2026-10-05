@@ -27,7 +27,7 @@ const LIT_TILE = {
  * Tap anywhere to toggle. Dimmable lights get a separate brightness button
  * rather than a long-press, which nobody would discover on a wall panel.
  */
-const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
+const DeviceTile = ({ entity, name, status, disabled, onToggle, onAdjust }) => {
   const on = isOn(entity);
   const unavailable = isUnavailable(entity);
   const Icon = ICONS[domainOf(entity.entity_id)] || SwitchIcon;
@@ -36,7 +36,7 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
 
   return (
     <div
-      className="card-inset overflow-hidden"
+      className="card-inset h-full overflow-hidden"
       style={on ? LIT_TILE : undefined}
     >
       <button
@@ -44,7 +44,7 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
         onClick={() => onToggle(entity)}
         disabled={disabled || unavailable}
         aria-pressed={on}
-        className="card-inset-hover flex min-h-[92px] w-full items-center gap-2.5 p-2.5 text-left disabled:opacity-45"
+        className={`card-inset-hover flex min-h-[92px] w-full items-center gap-2.5 p-2.5 text-left disabled:opacity-45 ${dimmable ? '' : 'h-full'}`}
       >
         <span
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors duration-200"
@@ -67,7 +67,9 @@ const DeviceTile = ({ entity, name, disabled, onToggle, onAdjust }) => {
 
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-fg">{name}</span>
-          <span className="nums block text-sm text-fg-muted">{statusText(entity)}</span>
+          <span className="nums block text-sm text-fg-muted">
+            {status ?? statusText(entity)}
+          </span>
         </span>
       </button>
 

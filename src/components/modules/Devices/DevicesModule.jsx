@@ -1,13 +1,16 @@
 import { useCallback, useState } from 'react';
 import { useHomeAssistant } from '../../../hooks/useHomeAssistant';
 import { useDisplay } from '../../../hooks/useDisplay';
-import { displayName, isOn } from '../../../lib/haEntities';
+import { displayName, isOn, isUnavailable } from '../../../lib/haEntities';
 import { BulbIcon, HomeIcon, PowerIcon, WarningIcon } from '../../icons';
 import DeviceTile from './DeviceTile';
 import BrightnessSheet from './BrightnessSheet';
 
 /** Tiles per row in the device half of the 800px panel. */
 const COLUMNS = 2;
+const BED_LIGHT_IDS = ['light.bed_light_j', 'light.bed_light_r'];
+const BED_LIGHT_ID_SET = new Set(BED_LIGHT_IDS);
+const BED_LIGHT_GROUP_ENTITY_ID = 'light.home_interface_bed_lights';
 
 const Message = ({ icon, title, detail, action }) => (
   <div className="card flex h-full w-full flex-col items-center justify-center gap-4 p-6 text-center">
@@ -100,6 +103,28 @@ const DevicesModule = ({ onSettingsClick }) => {
   const all = groups.flatMap((g) => g.entities);
   const onCount = all.filter(isOn).length;
   const offCount = all.filter((entity) => entity.state === 'off').length;
+  const bedLights = BED_LIGHT_IDS.map((id) => all.find((entity) => entity.entity_id === id))
+    .filter(Boolean);
+  const hasBedLights = bedLights.length === BED_LIGHT_IDS.length;
+  const bedLightsOn = bedLights.filter(isOn).length;
+  const bedLightsUnavailable = bedLights.some(isUnavailable);
+  const bedLightGroup = hasBedLights
+    ? groups.find((group) => group.entities.some((entity) => BED_LIGHT_ID_SET.has(entity.entity_id)))
+    : null;
+  const bedLightsEntity = {
+    entity_id: BED_LIGHT_GROUP_ENTITY_ID,
+    state: bedLightsUnavailable ? 'unavailable' : bedLightsOn > 0 ? 'on' : 'off',
+    attributes: { friendly_name: 'Bed Lights' },
+  };
+  const bedLightsStatus = bedLightsUnavailable
+    ? 'Unavailable'
+    : bedLightsOn === BED_LIGHT_IDS.length
+      ? 'Both on'
+      : bedLightsOn === 0
+        ? 'Off'
+        : `${bedLightsOn} of ${BED_LIGHT_IDS.length} on`;
+  const toggleBedLights = () =>
+    bedLightsOn > 0 ? turnOff(bedLights) : turnOn(bedLights);
   const adjusting = adjustingId && all.find((e) => e.entity_id === adjustingId);
   const adjustingGroup = adjusting && groups.find((g) => g.entities.includes(adjusting));
 
@@ -147,7 +172,9 @@ const DevicesModule = ({ onSettingsClick }) => {
                 style={{ gridTemplateColumns: `repeat(${COLUMNS}, minmax(0, 1fr))` }}
               >
                 {groups.map((group) => {
-                  const span = Math.min(group.entities.length, COLUMNS);
+                  const showBedLights = group === bedLightGroup;
+                  const tileCount = group.entities.length + (showBedLights ? 1 : 0);
+                  const span = Math.min(tileCount, COLUMNS);
                   return (
                     <section key={group.id ?? 'other'} style={{ gridColumn: `span ${span}` }}>
                       {group.name && (
@@ -157,6 +184,16 @@ const DevicesModule = ({ onSettingsClick }) => {
                         className="grid gap-3"
                         style={{ gridTemplateColumns: `repeat(${span}, minmax(0, 1fr))` }}
                       >
+                        {showBedLights && (
+                          <DeviceTile
+                            key={BED_LIGHT_GROUP_ENTITY_ID}
+                            entity={bedLightsEntity}
+                            name="Bed Lights"
+                            status={bedLightsStatus}
+                            disabled={stale || bedLightsUnavailable}
+                            onToggle={toggleBedLights}
+                          />
+                        )}
                         {group.entities.map((entity) => (
                           <DeviceTile
                             key={entity.entity_id}
