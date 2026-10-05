@@ -98,3 +98,44 @@ test('new entities reconcile after registry events and periodic safety checks', 
     'light.table',
   ]);
 });
+
+test('a WebSocket stuck connecting is closed so the retry path can run', async (t) => {
+  const originalWebSocket = globalThis.WebSocket;
+
+  class HungWebSocket {
+    static OPEN = 1;
+    static instances = [];
+
+    constructor() {
+      this.readyState = 0;
+      HungWebSocket.instances.push(this);
+    }
+
+    close() {
+      this.readyState = 3;
+      queueMicrotask(() => this.onclose?.());
+    }
+  }
+
+  globalThis.WebSocket = HungWebSocket;
+  t.after(() => {
+    globalThis.WebSocket = originalWebSocket;
+  });
+
+  const statuses = [];
+  const client = connectHomeAssistant(
+    'http://homeassistant.local:8123',
+    'token',
+    {
+      filter: () => true,
+      onStatus: (status) => statuses.push(status),
+    },
+    { connectTimeoutMs: 10 }
+  );
+  t.after(() => client.close());
+
+  await waitFor(() => statuses.includes('closed'));
+
+  assert.equal(HungWebSocket.instances[0].readyState, 3);
+  assert.deepEqual(statuses.slice(0, 2), ['connecting', 'closed']);
+});

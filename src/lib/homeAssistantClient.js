@@ -28,6 +28,8 @@ const REGISTRY_EVENTS = [
 const REGISTRY_REFRESH_MS = 750;
 /** Safety net for integrations that add/remove entities without a registry event reaching us. */
 const STATE_RECONCILE_MS = 60_000;
+/** Chromium can leave a WebSocket in CONNECTING forever during the Pi boot race. */
+const CONNECT_TIMEOUT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 
 const httpToWs = (url) => {
@@ -75,23 +77,35 @@ const buildLayout = (areas, devices, display) => {
  *   onLayout: (layout: {areas: {id: string, name: string}[], entities: Map<string, {areaId: string|null, hidden: boolean}>}) => void,
  *   onStatus: (status: 'connecting'|'open'|'closed'|'auth_failed'|'invalid_url') => void,
  * }} handlers
- * @param {{reconcileMs?: number, registryRefreshMs?: number, requestTimeoutMs?: number}} options
+ * @param {{reconcileMs?: number, registryRefreshMs?: number, connectTimeoutMs?: number, requestTimeoutMs?: number}} options
  */
 export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
   const reconcileMs = options.reconcileMs ?? STATE_RECONCILE_MS;
   const registryRefreshMs = options.registryRefreshMs ?? REGISTRY_REFRESH_MS;
+  const connectTimeoutMs = options.connectTimeoutMs ?? CONNECT_TIMEOUT_MS;
   const requestTimeoutMs = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   let ws = null;
   let nextId = 1;
   const pending = new Map();
   let closedByCaller = false;
   let reconnectTimer = null;
+  let connectTimer = null;
   let registryTimer = null;
   let reconcileTimer = null;
   let reconnectDelay = 1000;
   let syncPromise = null;
   let currentStates = new Map();
   let currentLayout = null;
+
+  const scheduleReconnect = () => {
+    if (closedByCaller || reconnectTimer) return;
+    handlers.onStatus?.('closed');
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      open();
+    }, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+  };
 
   const send = (msg) =>
     new Promise((resolve, reject) => {
@@ -222,10 +236,36 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
     }
 
     handlers.onStatus?.('connecting');
-    ws = new WebSocket(wsUrl);
     let authFailed = false;
+    let socket;
 
-    ws.onmessage = (event) => {
+    try {
+      socket = new WebSocket(wsUrl);
+      ws = socket;
+    } catch {
+      scheduleReconnect();
+      return;
+    }
+
+    // On this Pi, Chromium has occasionally kept a boot-time connection in
+    // CONNECTING indefinitely even after Home Assistant was ready. No close
+    // event means the normal retry path never runs, leaving the page spinning
+    // forever. Abort that handshake and let the existing backoff reconnect.
+    clearTimeout(connectTimer);
+    connectTimer = setTimeout(() => {
+      if (socket.readyState !== WebSocket.OPEN) {
+        socket.close();
+        // Some Chromium hangs also fail to deliver `close`; do not depend on
+        // that event to escape the permanent loading screen.
+        scheduleReconnect();
+      }
+    }, connectTimeoutMs);
+
+    socket.onopen = () => {
+      clearTimeout(connectTimer);
+    };
+
+    socket.onmessage = (event) => {
       const msg = JSON.parse(event.data);
 
       switch (msg.type) {
@@ -278,7 +318,11 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
       }
     };
 
-    ws.onclose = () => {
+    socket.onclose = () => {
+      // A timed-out socket can report its close after its replacement opens.
+      // It must not tear down requests belonging to the new connection.
+      if (ws !== socket) return;
+      clearTimeout(connectTimer);
       pending.forEach((p) => {
         clearTimeout(p.timer);
         p.reject(new Error('Connection closed'));
@@ -288,12 +332,10 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
       clearTimeout(reconcileTimer);
       syncPromise = null;
       if (closedByCaller || authFailed) return;
-      handlers.onStatus?.('closed');
-      reconnectTimer = setTimeout(open, reconnectDelay);
-      reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+      scheduleReconnect();
     };
 
-    ws.onerror = () => {
+    socket.onerror = () => {
       // onclose fires right after; the reconnect logic lives there.
     };
   };
@@ -309,6 +351,7 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
     close() {
       closedByCaller = true;
       clearTimeout(reconnectTimer);
+      clearTimeout(connectTimer);
       clearTimeout(registryTimer);
       clearTimeout(reconcileTimer);
       pending.forEach((p) => clearTimeout(p.timer));
