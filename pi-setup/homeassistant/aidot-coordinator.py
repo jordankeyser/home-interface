@@ -1,15 +1,18 @@
-"""Coordinator for AiDot with routed-device discovery fallback.
+"""Coordinator for AiDot with routed-device discovery and recovery.
 
 Home Assistant's upstream AiDot integration discovers bulbs with a UDP
 broadcast. Broadcasts do not cross routed subnets, even when the devices are
 directly reachable. This copy preserves the upstream behavior and uses the
 private IP reported by AiDot Cloud only when broadcast discovery has not
-already supplied an address.
+already supplied an address. It also bounds connection attempts and schedules
+clean retries so one stalled bulb cannot remain unavailable forever.
 """
 
+import asyncio
 from datetime import timedelta
 from ipaddress import ip_address
 import logging
+import socket
 from typing import Any, override
 
 from aidot.client import AidotClient
@@ -35,7 +38,86 @@ from .const import DOMAIN
 type AidotConfigEntry = ConfigEntry[AidotDeviceManagerCoordinator]
 _LOGGER = logging.getLogger(__name__)
 
-UPDATE_DEVICE_LIST_INTERVAL = timedelta(hours=6)
+UPDATE_DEVICE_LIST_INTERVAL = timedelta(minutes=5)
+CONNECT_TIMEOUT_SECONDS = 5
+LOGIN_TIMEOUT_SECONDS = 8
+RECONNECT_DELAY_SECONDS = 15
+CLOSE_TIMEOUT_SECONDS = 1
+
+
+async def _close_transport(self: DeviceClient) -> None:
+    """Close a failed transport without letting cleanup stall recovery."""
+    writer = self.writer
+    self.reader = self.writer = None
+    if writer is None:
+        return
+    writer.close()
+    try:
+        await asyncio.wait_for(writer.wait_closed(), timeout=CLOSE_TIMEOUT_SECONDS)
+    except (TimeoutError, OSError):
+        pass
+
+
+async def _reliable_connect(self: DeviceClient, ip_address: str) -> None:
+    """Connect with time limits and leave every failure retryable."""
+    self.reader = self.writer = None
+    self._connecting = True
+    self._ip_address = ip_address
+    try:
+        self.reader, self.writer = await asyncio.wait_for(
+            asyncio.open_connection(ip_address, 10000),
+            timeout=CONNECT_TIMEOUT_SECONDS,
+        )
+        sock: socket.socket = self.writer.get_extra_info("socket")
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        self.seq_num = 1
+        await asyncio.wait_for(self.login(), timeout=LOGIN_TIMEOUT_SECONDS)
+        if not self.status.online:
+            raise ConnectionError("AiDot login did not complete")
+        self._connect_and_login = True
+    except asyncio.CancelledError:
+        self._connect_and_login = False
+        self.status.online = False
+        self._notify_status_update()
+        await _close_transport(self)
+        raise
+    except Exception as error:
+        self._connect_and_login = False
+        self.status.online = False
+        self._notify_status_update()
+        await _close_transport(self)
+        _LOGGER.warning(
+            "AiDot device %s connection failed (%s); retry scheduled",
+            self.device_id,
+            type(error).__name__,
+        )
+        self._schedule_reconnect()
+    finally:
+        self._connecting = False
+
+
+def _reliable_schedule_reconnect(self: DeviceClient) -> None:
+    """Schedule one bounded reconnect instead of allowing a stuck task."""
+    if self._is_close or self._reconnect_handle is not None:
+        return
+
+    def _retry() -> None:
+        self._reconnect_handle = None
+        if not self._is_close:
+            self._login_task = asyncio.create_task(self.async_login())
+
+    self._reconnect_handle = asyncio.get_running_loop().call_later(
+        RECONNECT_DELAY_SECONDS,
+        _retry,
+    )
+
+
+# python-aidot 0.3.56 can wait forever for a login response. Once that happens,
+# its `_connecting` flag prevents every later discovery response from retrying.
+# Patch the two narrow lifecycle methods until the upstream library gains
+# bounded connection handling.
+DeviceClient.connect = _reliable_connect
+DeviceClient._schedule_reconnect = _reliable_schedule_reconnect
 
 
 def _cloud_reported_private_ip(device: dict[str, Any]) -> str | None:
@@ -156,14 +238,18 @@ class AidotDeviceManagerCoordinator(DataUpdateCoordinator[None]):
             # If no broadcast response was received, connect to the private
             # address the device itself last reported to AiDot Cloud. This
             # supports reachable bulbs on another routed Wi-Fi subnet.
-            if getattr(device_client, "_ip_address", None) is None:
-                fallback_ip = _cloud_reported_private_ip(device)
-                if fallback_ip is not None:
+            fallback_ip = _cloud_reported_private_ip(device)
+            current_ip = getattr(device_client, "_ip_address", None)
+            should_refresh_ip = fallback_ip is not None and (
+                current_ip is None or not device_client.connect_and_login
+            )
+            if should_refresh_ip:
+                if current_ip != fallback_ip:
                     _LOGGER.info(
                         "Using cloud-reported local address for AiDot device %s",
                         dev_id,
                     )
-                    device_client.update_ip_address(fallback_ip)
+                device_client.update_ip_address(fallback_ip)
 
             if dev_id not in self.device_coordinators:
                 device_coordinator = AidotDeviceUpdateCoordinator(

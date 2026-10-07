@@ -81,9 +81,13 @@ subnet boundary.
 `homeassistant/aidot-coordinator.py` is a narrow override of Home Assistant's
 AiDot coordinator. It keeps broadcast discovery as the first choice, then uses
 the private local address reported by AiDot Cloud when no broadcast address is
-available. Public addresses are rejected. The override is mounted read-only
-over the built-in coordinator from `~/homeassistant/compose.yml`, so it
-survives container recreation without modifying the image.
+available. Public addresses are rejected. It also puts time limits around
+local connection and login attempts, retries failed sessions after 15 seconds,
+and refreshes device addresses every five minutes. This prevents one stalled
+socket from leaving a reachable light permanently unavailable. The override is
+mounted read-only over the built-in coordinator from
+`~/homeassistant/compose.yml`, so it survives container recreation without
+modifying the image.
 
 Before updating Home Assistant, compare the override with the new built-in
 coordinator. Remove the compose mount to return to the unmodified integration.

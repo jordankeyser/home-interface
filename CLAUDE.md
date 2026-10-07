@@ -111,8 +111,10 @@ because it would replace the OS the kiosk runs on.
   mounts `~/homeassistant/overrides/aidot/coordinator.py` over the built-in
   AiDot coordinator; the tracked source is
   `pi-setup/homeassistant/aidot-coordinator.py`. It falls back to the private
-  address reported by AiDot Cloud when UDP discovery cannot cross the subnet;
-  review the override before Home Assistant upgrades.
+  address reported by AiDot Cloud when UDP discovery cannot cross the subnet,
+  bounds TCP/login attempts, retries failed sessions, and periodically refreshes
+  device addresses so a dropped connection cannot remain stuck; review the
+  override before Home Assistant upgrades.
 - **Update:**
   `sudo docker compose -f ~/homeassistant/compose.yml pull && sudo docker compose -f ~/homeassistant/compose.yml up -d`
 - **Logs:** `sudo docker logs -f homeassistant`
