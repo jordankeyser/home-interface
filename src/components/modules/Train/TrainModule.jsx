@@ -42,16 +42,27 @@ const TrainModule = () => {
   const [expanded, setExpanded] = useState(() => new Set());
   const [now, setNow] = useState(() => Date.now());
 
-  // Countdowns stay accurate between fetches. setState here is inside an
-  // interval callback, which is the supported pattern.
+  // Countdowns stay accurate between fetches. The clock is frozen while the
+  // panel sleeps, so on wake it ticks immediately rather than waiting 15s —
+  // otherwise freshly fetched arrivals were measured against the moment the
+  // screen went dark and showed hours ("245 min") instead of minutes.
+  // setState here is inside timer callbacks, which is the supported pattern.
   useEffect(() => {
     if (isAsleep) return undefined;
-    const id = setInterval(() => setNow(Date.now()), 15_000);
-    return () => clearInterval(id);
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const id = setInterval(tick, 15_000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, [isAsleep]);
 
+  // A board fetched after the last tick is never compared with an older clock.
+  const clock = Math.max(now, lastUpdated?.getTime() ?? 0);
+
   const minutesUntil = (arrT) => {
-    const mins = Math.round((new Date(arrT).getTime() - now) / 60_000);
+    const mins = Math.round((new Date(arrT).getTime() - clock) / 60_000);
     return mins <= 0 ? null : mins;
   };
 
