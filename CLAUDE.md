@@ -18,6 +18,14 @@ features and theming.
   scrolling or gestures must be tested on the panel before more changes are
   stacked on it. See the incident log below for why.
 
+- **Run Claude locally for this repo**: the Claude desktop app in a local
+  session, or `claude` in Terminal on the Mac. Cloud and sandboxed sessions
+  (including a cloud session linked to the Mac) don't have the Mac's SSH keys,
+  so they can't SSH to the Pi or push to GitHub, and the owner ends up running
+  those steps by hand. A linked session's shell is also Linux, so an
+  `npm install` run there puts Linux-only native binaries in `node_modules`;
+  re-run `npm install` on the Mac afterwards.
+
 ## Hardware and OS
 
 | | |
