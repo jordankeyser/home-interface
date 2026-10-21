@@ -279,3 +279,45 @@ export const SlidersIcon = (props) => (
     <circle cx="8.5" cy="16.5" r="2.3" />
   </Svg>
 );
+
+/* ---------------------------------------------------------------- vacuum -- */
+
+export const VacuumIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="8.6" />
+    <circle cx="12" cy="12" r="3.1" />
+    <path d="M7.4 6.9h9.2" />
+  </Svg>
+);
+
+export const DockIcon = (props) => (
+  <Svg {...props}>
+    <path d="M4 20h16" />
+    <path d="M6.5 20V9.5a5.5 5.5 0 0 1 11 0V20" />
+    <path d="M12 9.5v4M10 13.5h4" />
+  </Svg>
+);
+
+export const LocateIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="6.5" />
+    <circle cx="12" cy="12" r="2" />
+    <path d="M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7" />
+  </Svg>
+);
+
+export const BatteryIcon = ({ level = 100, ...props }) => (
+  <Svg {...props}>
+    <rect x="2.8" y="7.2" width="16.4" height="9.6" rx="2.4" />
+    <path d="M21.2 10.6v2.8" />
+    <rect
+      x="5"
+      y="9.4"
+      width={Math.max(0.8, (Math.min(100, Math.max(0, level)) / 100) * 12)}
+      height="5.2"
+      rx="1"
+      fill="currentColor"
+      stroke="none"
+    />
+  </Svg>
+);

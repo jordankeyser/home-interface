@@ -16,6 +16,7 @@
  *   client -> {id, type:"call_service", domain, service, service_data} -> result
  *   client -> {id, type:"config/area_registry/list" | "config/device_registry/list"
  *                      | "config/entity_registry/list_for_display"}     -> result
+ *   client -> {id, type:"config/entity_registry/get_entries", entity_ids} -> result (full entries, with options)
  */
 
 const REGISTRY_EVENTS = [
@@ -56,6 +57,12 @@ const buildLayout = (areas, devices, display) => {
     entities.set(e.ei, {
       areaId: e.ai ?? deviceArea.get(e.di) ?? null,
       hidden: Boolean(e.hb) || e.ec !== undefined,
+      // Lets a page find an appliance's companion entities (a vacuum's
+      // cleaning-mode select, its battery sensor) by device and translation
+      // key rather than by guessing at entity ids.
+      deviceId: e.di ?? null,
+      platform: e.pl ?? null,
+      translationKey: e.tk ?? null,
     });
   });
 
@@ -74,8 +81,9 @@ const buildLayout = (areas, devices, display) => {
  *   filter: (entityId: string) => boolean,
  *   onStates: (states: Map<string, object>) => void,
  *   onStateChanged: (entityId: string, newState: object | null) => void,
- *   onLayout: (layout: {areas: {id: string, name: string}[], entities: Map<string, {areaId: string|null, hidden: boolean}>}) => void,
+ *   onLayout: (layout: {areas: {id: string, name: string}[], entities: Map<string, {areaId: string|null, hidden: boolean, deviceId: string|null, platform: string|null, translationKey: string|null}>}) => void,
  *   onStatus: (status: 'connecting'|'open'|'closed'|'auth_failed'|'invalid_url') => void,
+ *   onSync?: () => void,
  * }} handlers
  * @param {{reconcileMs?: number, registryRefreshMs?: number, connectTimeoutMs?: number, requestTimeoutMs?: number}} options
  */
@@ -159,7 +167,13 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
     }
     for (const [id, meta] of next.entities) {
       const previous = currentLayout.entities.get(id);
-      if (!previous || meta.areaId !== previous.areaId || meta.hidden !== previous.hidden) {
+      if (
+        !previous ||
+        meta.areaId !== previous.areaId ||
+        meta.hidden !== previous.hidden ||
+        meta.deviceId !== previous.deviceId ||
+        meta.translationKey !== previous.translationKey
+      ) {
         return false;
       }
     }
@@ -185,9 +199,16 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
       // Rooms are a nicety: if the registries can't be read (a non-admin
       // token, say) the devices still show, just ungrouped.
       loadLayout().catch((err) => console.warn('[ha] no room layout:', err.message)),
-    ]).finally(() => {
-      syncPromise = null;
-    });
+    ])
+      .then(() => {
+        // Registry details the layout doesn't carry (a vacuum's room mapping
+        // lives in its entity options) can be refreshed here: this runs after
+        // every snapshot, registry edit and periodic reconcile.
+        handlers.onSync?.();
+      })
+      .finally(() => {
+        syncPromise = null;
+      });
     return syncPromise;
   };
 
@@ -346,6 +367,11 @@ export function connectHomeAssistant(baseUrl, token, handlers, options = {}) {
     /** @param {string} domain @param {string} service @param {object} serviceData */
     callService(domain, service, serviceData) {
       return send({ type: 'call_service', domain, service, service_data: serviceData });
+    },
+
+    /** Any other WebSocket command, e.g. `{type: 'config/entity_registry/get_entries', entity_ids}`. */
+    request(msg) {
+      return send(msg);
     },
 
     close() {

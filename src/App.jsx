@@ -7,6 +7,7 @@ import ClockBar from './components/ClockBar';
 import WeatherModule from './components/modules/Weather/WeatherModule';
 import TrainModule from './components/modules/Train/TrainModule';
 import DevicesModule from './components/modules/Devices/DevicesModule';
+import VacuumModule from './components/modules/Vacuum/VacuumModule';
 
 function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -37,6 +38,9 @@ function App() {
 
             {/* Page 2: smart-home devices */}
             <DevicesModule key="devices" onSettingsClick={openSettings} />
+
+            {/* Page 3: robot vacuum */}
+            <VacuumModule key="vacuum" onSettingsClick={openSettings} />
           </Pager>
         </Layout>
       </SleepMode>
