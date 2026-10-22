@@ -3,8 +3,11 @@ import {
   domainOf,
   isOn,
   isUnavailable,
+  lightColor,
   statusText,
   supportsBrightness,
+  supportsColor,
+  supportsColorTemp,
 } from '../../../lib/haEntities';
 import { BulbIcon, FanIcon, SlidersIcon, SwitchIcon } from '../../icons';
 
@@ -33,6 +36,9 @@ const DeviceTile = ({ entity, name, status, disabled, onToggle, onAdjust }) => {
   const Icon = ICONS[domainOf(entity.entity_id)] || SwitchIcon;
   const dimmable = supportsBrightness(entity) && !unavailable;
   const pct = on && dimmable ? brightnessPct(entity) : null;
+  const colorable = supportsColor(entity) || supportsColorTemp(entity);
+  // A dot in the bulb's colour makes it obvious this button changes colour too.
+  const dot = on && colorable ? lightColor(entity) : null;
 
   return (
     <div
@@ -79,10 +85,16 @@ const DeviceTile = ({ entity, name, status, disabled, onToggle, onAdjust }) => {
           onClick={() => onAdjust(entity)}
           disabled={disabled}
           className="flex min-h-12 w-full items-center justify-center gap-2 border-t border-line px-3 text-sm font-semibold text-fg-muted active:bg-surface-hover disabled:opacity-45"
-          aria-label={`Adjust ${name} brightness`}
+          aria-label={`Adjust ${name} ${colorable ? 'brightness and colour' : 'brightness'}`}
         >
           <SlidersIcon className="h-5 w-5" />
           <span>{pct === null ? 'Brightness' : `${pct}% brightness`}</span>
+          {dot && (
+            <span
+              className="h-3.5 w-3.5 shrink-0 rounded-full border border-line-strong"
+              style={{ background: dot }}
+            />
+          )}
         </button>
       )}
     </div>

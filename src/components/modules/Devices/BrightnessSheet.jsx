@@ -1,12 +1,84 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { brightnessPct, isOn } from '../../../lib/haEntities';
+import {
+  brightnessPct,
+  hsToRgb,
+  isOn,
+  kelvinRange,
+  kelvinToRgb,
+  supportsColor,
+  supportsColorTemp,
+} from '../../../lib/haEntities';
 
 /** Wi-Fi bulbs choke on a command per pointermove; this is plenty responsive. */
 const SEND_EVERY_MS = 350;
 const PRESETS = [25, 50, 75, 100];
 
+const COLORS = [
+  { name: 'Red', hs: [0, 100] },
+  { name: 'Orange', hs: [30, 100] },
+  { name: 'Yellow', hs: [52, 100] },
+  { name: 'Green', hs: [120, 100] },
+  { name: 'Cyan', hs: [180, 100] },
+  { name: 'Blue', hs: [230, 100] },
+  { name: 'Purple', hs: [275, 100] },
+  { name: 'Pink', hs: [320, 70] },
+].map((c) => ({ ...c, rgb: hsToRgb(c.hs) }));
+
+const WHITES = [
+  { name: 'Candle', kelvin: 2200 },
+  { name: 'Warm', kelvin: 2700 },
+  { name: 'Neutral', kelvin: 4000 },
+  { name: 'Daylight', kelvin: 6500 },
+];
+
 const clamp = (n) => Math.min(100, Math.max(0, n));
+
+/**
+ * The whites this bulb can make, clamped to its range. When two clamp to the
+ * same value, the one that needed the smaller nudge keeps its name.
+ */
+const whitesFor = (entity) => {
+  const [min, max] = kelvinRange(entity);
+  const byKelvin = new Map();
+  WHITES.forEach((w) => {
+    const kelvin = Math.min(max, Math.max(min, w.kelvin));
+    const prev = byKelvin.get(kelvin);
+    if (!prev || Math.abs(w.kelvin - kelvin) < Math.abs(prev.wanted - kelvin)) {
+      byKelvin.set(kelvin, { name: w.name, wanted: w.kelvin, kelvin, rgb: kelvinToRgb(kelvin) });
+    }
+  });
+  return [...byKelvin.values()];
+};
+
+const nearest = (items, distance) =>
+  items.reduce((best, item) => (distance(item) < distance(best) ? item : best), items[0]);
+
+const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+
+/** Which swatch matches what the bulb is showing now, if any. */
+const activeSwatch = (entity, whites) => {
+  if (!isOn(entity)) return null;
+  const a = entity.attributes || {};
+  if (a.color_mode === 'color_temp' && typeof a.color_temp_kelvin === 'number') {
+    return whites.length ? nearest(whites, (w) => Math.abs(w.kelvin - a.color_temp_kelvin)) : null;
+  }
+  // Pale tints read as white, not as the nearest colour.
+  if (Array.isArray(a.hs_color) && a.hs_color[1] >= 25) {
+    const [h, s] = a.hs_color;
+    return nearest(COLORS, (c) => hueGap(c.hs[0], h) + Math.abs(c.hs[1] - s) / 2);
+  }
+  return null;
+};
+
+const rgbCss = (rgb) => `rgb(${rgb.join(' ')})`;
+
+const SwatchRow = ({ label, className = 'gap-2', children }) => (
+  <div className="mt-4 flex items-center gap-3">
+    <span className="w-16 shrink-0 text-sm font-semibold text-fg-muted">{label}</span>
+    <div className={`flex min-w-0 flex-1 ${className}`}>{children}</div>
+  </div>
+);
 
 /**
  * Sends at most once per `ms` while values stream in, and always sends the
@@ -46,10 +118,14 @@ const createThrottle = (ms) => {
  * initialises from the light each time; while it's open, the finger wins over
  * any state updates arriving from Home Assistant.
  *
+ * Bulbs that report colour or colour-temperature modes also get a row of
+ * colour swatches and a row of whites. Those send at once, unthrottled — one
+ * tap is one command.
+ *
  * Portalled to <body>: the panel's burn-in transform traps `position: fixed`
  * inside it, so rendered in place this would be clipped to the devices card.
  */
-const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
+const BrightnessSheet = ({ entity, name, onChange, onColor, onClose }) => {
   const [value, setValue] = useState(() =>
     isOn(entity) ? (brightnessPct(entity) ?? 100) : 0
   );
@@ -96,6 +172,20 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
     throttle.flush();
   };
 
+  const showColors = supportsColor(entity);
+  const whites = supportsColorTemp(entity) ? whitesFor(entity) : [];
+  const active = activeSwatch(entity, whites);
+
+  /** turn_on lights the bulb, so an "Off" slider comes back up with it. */
+  const pickColor = (color) => {
+    // A brightness change still waiting in the throttle mustn't land after
+    // this and switch the bulb back off.
+    throttle.flush();
+    const relight = value === 0 ? 100 : undefined;
+    if (relight) setValue(relight);
+    onColor({ ...color, brightnessPct: relight });
+  };
+
   const onKeyDown = (e) => {
     const step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[e.key];
     if (step) {
@@ -112,7 +202,7 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
       onClick={(e) => e.target === e.currentTarget && onClose()}
       role="dialog"
       aria-modal="true"
-      aria-label={`${name} brightness`}
+      aria-label={`${name} light settings`}
     >
       <div className="card w-full max-w-[620px] p-5">
         <div className="flex items-start justify-between gap-4">
@@ -187,6 +277,49 @@ const BrightnessSheet = ({ entity, name, onChange, onClose }) => {
             </button>
           ))}
         </div>
+
+        {showColors && (
+          <SwatchRow label="Colour" className="justify-between gap-1">
+            {COLORS.map((c) => (
+              <button
+                key={c.name}
+                type="button"
+                onClick={() => pickColor({ hs: c.hs, rgb: c.rgb })}
+                className="h-12 w-12 shrink-0 cursor-pointer rounded-full border-2 border-line"
+                aria-label={c.name}
+                aria-pressed={active === c}
+                style={{
+                  background: rgbCss(c.rgb),
+                  ...(active === c && {
+                    borderColor: 'var(--fg)',
+                    boxShadow: '0 0 0 3px var(--accent)',
+                  }),
+                }}
+              />
+            ))}
+          </SwatchRow>
+        )}
+
+        {whites.length > 0 && (
+          <SwatchRow label="White">
+            {whites.map((w) => (
+              <button
+                key={w.kelvin}
+                type="button"
+                onClick={() => pickColor({ kelvin: w.kelvin, rgb: w.rgb })}
+                className="btn flex-1 px-2"
+                aria-pressed={active === w}
+                style={active === w ? { borderColor: 'var(--accent)' } : undefined}
+              >
+                <span
+                  className="h-4 w-4 shrink-0 rounded-full border border-line"
+                  style={{ background: rgbCss(w.rgb) }}
+                />
+                {w.name}
+              </button>
+            ))}
+          </SwatchRow>
+        )}
       </div>
     </div>,
     document.body

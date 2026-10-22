@@ -37,6 +37,47 @@ export const brightnessPct = (entity) => {
   return typeof b === 'number' ? Math.max(1, Math.round((b / 255) * 100)) : null;
 };
 
+const COLOR_MODES = new Set(['hs', 'xy', 'rgb', 'rgbw', 'rgbww']);
+
+const colorModes = (entity) =>
+  domainOf(entity.entity_id) === 'light' ? entity.attributes?.supported_color_modes || [] : [];
+
+/** Any full-colour mode; Home Assistant accepts `hs_color` for all of them. */
+export const supportsColor = (entity) => colorModes(entity).some((m) => COLOR_MODES.has(m));
+
+export const supportsColorTemp = (entity) => colorModes(entity).includes('color_temp');
+
+export const kelvinRange = (entity) => [
+  entity.attributes?.min_color_temp_kelvin ?? 2000,
+  entity.attributes?.max_color_temp_kelvin ?? 6500,
+];
+
+/** The bulb's current colour as CSS, or null when it doesn't report one. */
+export const lightColor = (entity) => {
+  const rgb = entity.attributes?.rgb_color;
+  return Array.isArray(rgb) && rgb.length === 3 ? `rgb(${rgb.join(' ')})` : null;
+};
+
+/** Hue 0–360, saturation 0–100, at full value — for swatches and optimistic display. */
+export const hsToRgb = ([h, s]) => {
+  const sat = s / 100;
+  const f = (n) => {
+    const k = (n + h / 60) % 6;
+    return Math.round(255 * (1 - sat * Math.max(0, Math.min(k, 4 - k, 1))));
+  };
+  return [f(5), f(3), f(1)];
+};
+
+/** Approximate colour of a white at `kelvin` (Tanner Helland's fit). */
+export const kelvinToRgb = (kelvin) => {
+  const t = kelvin / 100;
+  const c = (n) => Math.round(Math.min(255, Math.max(0, n)));
+  const r = t <= 66 ? 255 : 329.7 * (t - 60) ** -0.1332;
+  const g = t <= 66 ? 99.47 * Math.log(t) - 161.12 : 288.12 * (t - 60) ** -0.0755;
+  const b = t >= 66 ? 255 : t <= 19 ? 0 : 138.52 * Math.log(t - 10) - 305.04;
+  return [c(r), c(g), c(b)];
+};
+
 export const friendlyName = (entity) =>
   entity.attributes?.friendly_name || entity.entity_id;
 

@@ -33,6 +33,7 @@ const DevicesModule = ({ onSettingsClick }) => {
     actionError,
     toggle,
     setBrightness,
+    setColor,
     turnOn,
     turnOff,
   } = useHomeAssistant();
@@ -252,6 +253,7 @@ const DevicesModule = ({ onSettingsClick }) => {
           entity={adjusting}
           name={displayName(adjusting, adjustingGroup?.name)}
           onChange={(pct) => setBrightness(adjusting, pct)}
+          onColor={(c) => setColor(adjusting, c)}
           onClose={closeBrightness}
         />
       )}

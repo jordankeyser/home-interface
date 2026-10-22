@@ -15,10 +15,11 @@ const blank = (key) => ({ key, status: 'connecting', loaded: false, states: EMPT
 const applyOverride = (entity, ov) => ({
   ...entity,
   state: ov.state,
-  attributes:
-    ov.brightness === undefined
-      ? entity.attributes
-      : { ...entity.attributes, brightness: ov.brightness },
+  attributes: {
+    ...entity.attributes,
+    ...(ov.brightness === undefined ? null : { brightness: ov.brightness }),
+    ...ov.attributes,
+  },
 });
 
 /**
@@ -170,6 +171,31 @@ export const useHomeAssistant = () => {
     [run]
   );
 
+  /**
+   * A colour (`hs`, hue/saturation) or a white (`kelvin`). `rgb` is only for
+   * showing the new colour before Home Assistant reports it; `brightnessPct`
+   * goes along when the light was off, so it comes on at a known level.
+   */
+  const setColor = useCallback(
+    (entity, { hs, kelvin, rgb, brightnessPct }) => {
+      const id = entity.entity_id;
+      const color = hs ? { hs_color: hs } : { color_temp_kelvin: kelvin };
+      const level = brightnessPct ? { brightness_pct: brightnessPct } : null;
+      return run(
+        'light',
+        'turn_on',
+        { entity_id: id, ...color, ...level },
+        [[id, {
+          state: 'on',
+          brightness: brightnessPct ? Math.round((brightnessPct / 100) * 255) : undefined,
+          attributes: { ...color, rgb_color: rgb, color_mode: hs ? 'hs' : 'color_temp' },
+        }]],
+        `Couldn’t change ${friendlyName(entity)}’s colour`
+      );
+    },
+    [run]
+  );
+
   /** Everything in the list that's on, off — one call, any mix of domains. */
   const turnOff = useCallback(
     (entities) => {
@@ -250,6 +276,7 @@ export const useHomeAssistant = () => {
     actionError,
     toggle,
     setBrightness,
+    setColor,
     turnOn,
     turnOff,
   };
