@@ -140,7 +140,10 @@ they're stored in the browser's `localStorage`. The address defaults to
 | `src/hooks/useHomeAssistant.js` | Connection lifecycle (open while awake, closed while asleep), grouping by room, optimistic toggles that revert if HA doesn't confirm within 6 s |
 | `src/lib/haEntities.js` | Which device types are shown (`DOMAINS`: light, switch, fan) and how they're read |
 | `src/components/modules/Devices/` | Devices page, tiles, brightness sheet |
-| `src/components/Pager.jsx` | Swipe between the trains/weather page and the devices page |
+| `src/components/Pager.jsx` | Swipe between the trains/weather page, the devices page and the vacuum page |
+| `src/lib/vacuum.js` | Finds the vacuum and its companion entities (by device and translation key), labels, and the room list from its area mapping |
+| `src/hooks/useVacuum.js` | The vacuum page's own connection (vacuum, select and sensor domains), commands, and optimistic setting changes |
+| `src/components/modules/Vacuum/` | Vacuum page: status, mode/suction/water/passes, room picker, start button |
 
 - **Protocol details:**
   - A rejected token stops reconnecting on purpose, so it doesn't pile up
@@ -149,6 +152,16 @@ they're stored in the browser's `localStorage`. The address defaults to
     entity id, `di` the device id, `ai` the area id, `ec` the entity category
     and `hb` the hidden flag.
   - An entity takes its device's area unless it has its own.
+- **Robot vacuum (Roborock Q7 L5):** the vacuum entity only does
+  start/pause/dock/locate and suction. Cleaning mode (vacuum, vacuum + mop,
+  mop), water flow and passes are `select` entities on the same device, with
+  translation keys `cleaning_mode`, `water_flow` and `cleaning_cycles`.
+  Rooms come from Home Assistant's "clean by area" mapping (vacuum entity →
+  gear → Configure areas), stored in the entity's registry options as
+  `vacuum.area_mapping`, and are cleaned with `vacuum.clean_area`
+  (`cleaning_area_id`: area ids). Roborock commands go through its cloud,
+  which bans clients that send too many, so the page never polls the robot
+  or calls `vacuum/get_segments` / `roborock.get_maps` itself.
 - **Adding a device type:** add an entry to `DOMAINS` in `haEntities.js` and an
   icon in `DeviceTile.jsx`. Anything beyond on/off plus brightness (climate,
   covers, locks) needs its own controls.

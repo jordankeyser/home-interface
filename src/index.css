@@ -754,3 +754,12 @@ textarea {
 body.kiosk-mode {
   cursor: none;
 }
+
+/* Segmented choices (the vacuum's mode, suction, water): the chosen one is lit. */
+@layer components {
+  .control-btn[aria-pressed='true'] {
+    background: linear-gradient(145deg, rgb(255 255 255 / 0.22), transparent 55%),
+      color-mix(in srgb, var(--accent) 30%, var(--surface));
+    color: var(--fg);
+  }
+}
