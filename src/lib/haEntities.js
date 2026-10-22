@@ -42,7 +42,7 @@ const COLOR_MODES = new Set(['hs', 'xy', 'rgb', 'rgbw', 'rgbww']);
 const colorModes = (entity) =>
   domainOf(entity.entity_id) === 'light' ? entity.attributes?.supported_color_modes || [] : [];
 
-/** Any full-colour mode; Home Assistant accepts `hs_color` for all of them. */
+/** Any full-color mode; Home Assistant accepts `hs_color` for all of them. */
 export const supportsColor = (entity) => colorModes(entity).some((m) => COLOR_MODES.has(m));
 
 export const supportsColorTemp = (entity) => colorModes(entity).includes('color_temp');
@@ -52,7 +52,7 @@ export const kelvinRange = (entity) => [
   entity.attributes?.max_color_temp_kelvin ?? 6500,
 ];
 
-/** The bulb's current colour as CSS, or null when it doesn't report one. */
+/** The bulb's current color as CSS, or null when it doesn't report one. */
 export const lightColor = (entity) => {
   const rgb = entity.attributes?.rgb_color;
   return Array.isArray(rgb) && rgb.length === 3 ? `rgb(${rgb.join(' ')})` : null;
@@ -68,7 +68,7 @@ export const hsToRgb = ([h, s]) => {
   return [f(5), f(3), f(1)];
 };
 
-/** Approximate colour of a white at `kelvin` (Tanner Helland's fit). */
+/** Approximate color of a white at `kelvin` (Tanner Helland's fit). */
 export const kelvinToRgb = (kelvin) => {
   const t = kelvin / 100;
   const c = (n) => Math.round(Math.min(255, Math.max(0, n)));

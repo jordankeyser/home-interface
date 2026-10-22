@@ -63,7 +63,7 @@ const activeSwatch = (entity, whites) => {
   if (a.color_mode === 'color_temp' && typeof a.color_temp_kelvin === 'number') {
     return whites.length ? nearest(whites, (w) => Math.abs(w.kelvin - a.color_temp_kelvin)) : null;
   }
-  // Pale tints read as white, not as the nearest colour.
+  // Pale tints read as white, not as the nearest color.
   if (Array.isArray(a.hs_color) && a.hs_color[1] >= 25) {
     const [h, s] = a.hs_color;
     return nearest(COLORS, (c) => hueGap(c.hs[0], h) + Math.abs(c.hs[1] - s) / 2);
@@ -118,8 +118,8 @@ const createThrottle = (ms) => {
  * initialises from the light each time; while it's open, the finger wins over
  * any state updates arriving from Home Assistant.
  *
- * Bulbs that report colour or colour-temperature modes also get a row of
- * colour swatches and a row of whites. Those send at once, unthrottled — one
+ * Bulbs that report color or color-temperature modes also get a row of
+ * color swatches and a row of whites. Those send at once, unthrottled — one
  * tap is one command.
  *
  * Portalled to <body>: the panel's burn-in transform traps `position: fixed`
@@ -279,7 +279,7 @@ const BrightnessSheet = ({ entity, name, onChange, onColor, onClose }) => {
         </div>
 
         {showColors && (
-          <SwatchRow label="Colour" className="justify-between gap-1">
+          <SwatchRow label="Color" className="justify-between gap-1">
             {COLORS.map((c) => (
               <button
                 key={c.name}

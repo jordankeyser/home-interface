@@ -172,8 +172,8 @@ export const useHomeAssistant = () => {
   );
 
   /**
-   * A colour (`hs`, hue/saturation) or a white (`kelvin`). `rgb` is only for
-   * showing the new colour before Home Assistant reports it; `brightnessPct`
+   * A color (`hs`, hue/saturation) or a white (`kelvin`). `rgb` is only for
+   * showing the new color before Home Assistant reports it; `brightnessPct`
    * goes along when the light was off, so it comes on at a known level.
    */
   const setColor = useCallback(
@@ -190,7 +190,7 @@ export const useHomeAssistant = () => {
           brightness: brightnessPct ? Math.round((brightnessPct / 100) * 255) : undefined,
           attributes: { ...color, rgb_color: rgb, color_mode: hs ? 'hs' : 'color_temp' },
         }]],
-        `Couldn’t change ${friendlyName(entity)}’s colour`
+        `Couldn’t change ${friendlyName(entity)}’s color`
       );
     },
     [run]

@@ -10,7 +10,7 @@ import {
   TrainIcon,
 } from '../../icons';
 
-/** Official CTA line colours, keyed by the API's route codes. */
+/** Official CTA line colors, keyed by the API's route codes. */
 const LINE_COLORS = {
   Red: '#c60c30',
   Blue: '#00a1de',

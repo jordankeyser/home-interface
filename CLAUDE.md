@@ -182,7 +182,7 @@ npm run build
     compiler thinks can run during render; move them to module scope or event
     handlers.
 - **Design rules:** no text below 13px (`--text-xs`) and no tap target below
-  48px (`.icon-btn` and `.btn` enforce it). Colours come from CSS variables in
+  48px (`.icon-btn` and `.btn` enforce it). Colors come from CSS variables in
   `src/index.css`.
 - `position: fixed` overlays must be portalled to `<body>`. The cards'
   `backdrop-filter` and the panel's burn-in `transform` trap fixed elements
