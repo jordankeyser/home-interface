@@ -17,7 +17,10 @@ const ACTIVITY_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touc
 const SleepMode = ({ children }) => {
   const { settings } = useSettings();
   const [isAsleep, setIsAsleep] = useState(false);
+  // True from the tap that wakes the panel until that tap's click has fired.
+  const [shielding, setShielding] = useState(false);
   const timerRef = useRef(null);
+  const shieldTimerRef = useRef(null);
 
   const idleMs = Math.max(0, Number(settings.idleSleepMinutes) || 0) * 60_000;
 
@@ -35,6 +38,28 @@ const SleepMode = ({ children }) => {
       return false;
     });
   }, []);
+
+  // The wake tap starts on the black overlay, but the click for that same tap
+  // fires a moment later. If the overlay is gone by then, Chromium delivers
+  // the click to whatever sits under the finger — the train card's Pause
+  // button, the settings gear, Refresh — so tapping a dark panel to wake it
+  // could silently pause arrivals. Keep a transparent copy of the overlay up
+  // until the tap finishes so it swallows that click.
+  const endShield = useCallback(() => {
+    clearTimeout(shieldTimerRef.current);
+    setShielding(false);
+  }, []);
+
+  const onOverlayPointerDown = useCallback(() => {
+    if (!isAsleep) return;
+    setShielding(true);
+    clearTimeout(shieldTimerRef.current);
+    // Safety net in case the click never arrives (a drag, a lost pointer).
+    shieldTimerRef.current = setTimeout(() => setShielding(false), 1000);
+    wake();
+  }, [isAsleep, wake]);
+
+  useEffect(() => () => clearTimeout(shieldTimerRef.current), []);
 
   // Idle countdown. Rearmed by any activity, and by waking.
   useEffect(() => {
@@ -76,12 +101,15 @@ const SleepMode = ({ children }) => {
     <DisplayContext.Provider value={value}>
       {children}
 
-      {isAsleep && (
+      {(isAsleep || shielding) && (
         <button
           type="button"
-          onPointerDown={wake}
-          className="fixed inset-0 z-[100] h-full w-full cursor-pointer bg-black"
+          onPointerDown={onOverlayPointerDown}
+          onClick={endShield}
+          onPointerCancel={endShield}
+          className={`fixed inset-0 z-[100] h-full w-full cursor-pointer ${isAsleep ? 'bg-black' : 'bg-transparent'}`}
           aria-label="Wake display"
+          tabIndex={isAsleep ? 0 : -1}
         />
       )}
     </DisplayContext.Provider>
